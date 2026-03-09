@@ -1,0 +1,8 @@
+{
+  "name": "Agro-Suste Market",
+  "description": "Plataforma de alto desempenho que liga produtores locais de Cuamba a compradores formais com integração de pagamentos reais via mPesa e e-Mola.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

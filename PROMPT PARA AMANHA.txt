@@ -1,0 +1,74 @@
+# PROMPT PARA IMPLEMENTAÇÃO DE INTERNACIONALIZAÇÃO TOTAL (MULTI-IDIOMAS) + CAMPO "OUTRO" DINÂMICO
+
+## 1. CONTEXTO GERAL
+Estou desenvolvendo um sistema web completo, que inclui:
+- Interface pública (front-end)
+- Painel de administração (back-office)
+- Formulários, mensagens, placeholders, botões, títulos, labels, validações, etc.
+
+**Requisito obrigatório:** O sistema deve ser **totalmente multilíngue**, suportando **todos os idiomas do mundo** (ex: Português, Inglês, Espanhol, Francês, Alemão, Mandarim, Árabe, etc.).
+
+A troca de idioma deve ser feita por meio de um seletor (ex: bandeiras ou dropdown) e, ao mudar o idioma, **TODOS** os textos do sistema devem ser exibidos no idioma selecionado — sem exceções. Isso inclui:
+- Textos estáticos (menus, títulos, rodapés)
+- Textos dinâmicos (mensagens de erro, confirmação, validação)
+- Labels e placeholders de todos os campos de formulário
+- Conteúdo gerado pelo sistema (emails, notificações)
+- Painel administrativo completo
+- Qualquer outro texto visível ao usuário
+
+**Comportamento esperado:**  
+Se o usuário selecionar **Francês**, todo o sistema deve ser exibido em Francês.  
+Se selecionar **Japonês**, todo o sistema deve ser exibido em Japonês.  
+E assim por diante, para **qualquer idioma disponível** no seletor.
+
+## 2. FUNCIONALIDADE ESPECÍFICA: CAMPO "OUTRO"
+Em **qualquer parte do sistema** (público ou admin), quando houver um campo de seleção (como `<select>` ou radio buttons) que contenha uma lista de opções, deverá existir uma opção chamada **"Outro"** (ou sua tradução equivalente no idioma ativo, ex: "Other", "Otro", "Autre", etc.).
+
+### Regras de comportamento:
+- Quando o usuário **clicar/selecionar a opção "Outro"** (ou seu equivalente traduzido), um campo de texto adicional deve **aparecer imediatamente abaixo** da lista de opções.
+- Esse campo de texto deve permitir que o usuário digite uma opção personalizada, caso nenhuma das opções pré-definidas atenda à necessidade.
+- Se o usuário **selecionar qualquer outra opção** (que não seja "Outro"), o campo de texto deve **desaparecer/ocultar-se** automaticamente.
+- O campo de texto adicional também deve ter seu **placeholder traduzido** de acordo com o idioma ativo no momento (ex: "Digite sua opção" / "Type your option" / "Escriba su opción" / "Saisissez votre option").
+- O comportamento de exibir/ocultar deve funcionar perfeitamente em **todos os idiomas suportados**.
+
+## 3. ABORDAGEM TÉCNICA OBRIGATÓRIA (i18n)
+Para garantir que **nenhum texto fique de fora**, a implementação deve utilizar um sistema centralizado de tradução, baseado em **arquivos de chave-valor** (ex: JSON, YAML, ou similar). A estrutura deve ser escalável para N idiomas.
+
+Exemplo de estrutura esperada:
+
+```json
+{
+  "pt": {
+    "select.other": "Outro",
+    "select.other.placeholder": "Digite sua opção aqui",
+    "submit.button": "Enviar",
+    "admin.title": "Painel Administrativo",
+    "error.required": "Este campo é obrigatório"
+    // ... todas as outras chaves para português
+  },
+  "en": {
+    "select.other": "Other",
+    "select.other.placeholder": "Type your option here",
+    "submit.button": "Submit",
+    "admin.title": "Admin Panel",
+    "error.required": "This field is required"
+    // ... todas as outras chaves para inglês
+  },
+  "es": {
+    "select.other": "Otro",
+    "select.other.placeholder": "Escriba su opción aquí",
+    "submit.button": "Enviar",
+    "admin.title": "Panel de Administración",
+    "error.required": "Este campo es obligatorio"
+    // ... todas as outras chaves para espanhol
+  },
+  "fr": {
+    "select.other": "Autre",
+    "select.other.placeholder": "Saisissez votre option ici",
+    "submit.button": "Envoyer",
+    "admin.title": "Panneau d'administration",
+    "error.required": "Ce champ est requis"
+    // ... todas as outras chaves para francês
+  }
+  // ... demais idiomas
+}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-MZ">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agro-Suste Market - Marketplace de Moçambique</title>
+    <!-- Favicon Oficial Agro-Suste (Folha Arco) -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 85C50 85 32 78 20 60C8 42 10 25 10 25C10 25 28 22 42 35C56 48 60 65 60 65' stroke='%231B5E20' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Cpath d='M48 28C48 28 65 15 85 18C105 21 95 45 95 45' stroke='%231B5E20' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Cpath d='M68 45C68 45 78 35 88 38C98 41 90 60 90 60C90 60 75 75 55 85' stroke='%231B5E20' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+            background-color: #FAF9F6;
+            color: #263238;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .shadow-soft {
+            box-shadow: 0 10px 30px -5px rgba(27, 94, 32, 0.08);
+        }
+
+        .shadow-strong {
+            box-shadow: 0 20px 40px -10px rgba(27, 94, 32, 0.15);
+        }
+
+        * {
+            transition: all 0.2s ease-in-out;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
