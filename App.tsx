@@ -19,14 +19,31 @@ const AppContent: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('agro_suste_products');
-    return saved ? JSON.parse(saved) : MOCK_PRODUCTS;
+    const existing = mockDb.getProducts();
+    // Merge MOCK_PRODUCTS: add any product that isn't already in the list by ID
+    const merged = [...existing];
+    MOCK_PRODUCTS.forEach(mp => {
+      if (!merged.find(p => p.id === mp.id)) {
+        merged.push(mp);
+      }
+    });
+    return merged;
   });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [partners, setPartners] = useState<User[]>(() => {
-    const saved = localStorage.getItem('agro_suste_partners');
-    return saved ? JSON.parse(saved) : MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+    const allUsers = mockDb.getUsers();
+    const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+    
+    // Fallback para os estáticos APENAS se não houver manuais, ou merge?
+    // User pediu para deixar 2 ou 3 apenas.
+    const merged = [...localPartners];
+    MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
+      if (!merged.find(p => p.email === mp.email)) {
+        merged.push(mp);
+      }
+    });
+    return merged;
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +51,7 @@ const AppContent: React.FC = () => {
     if (!sessionUser) return null;
     const metadata = sessionUser.user_metadata || {};
     // Verificação de Administrador via Email Principal ou Metadata
-    const isAdmin = sessionUser.email === 'jaimecebola001@gmail.com' || metadata.role === UserRole.ADMIN;
+    const isAdmin = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(sessionUser.email?.toLowerCase()) || metadata.role === UserRole.ADMIN;
 
     return {
       id: sessionUser.id,
@@ -58,6 +75,31 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
+    const handleDbChange = () => {
+      // Refresh products with merge logic
+      const existing = mockDb.getProducts();
+      const mergedProducts = [...existing];
+      MOCK_PRODUCTS.forEach(mp => {
+        if (!mergedProducts.find(p => p.id === mp.id)) {
+          mergedProducts.push(mp);
+        }
+      });
+      setProducts(mergedProducts);
+
+      // Refresh partners with merge logic
+      const allUsers = mockDb.getUsers();
+      const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+      const mergedPartners = [...localPartners];
+      MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
+        if (!mergedPartners.find(p => p.email === mp.email)) {
+          mergedPartners.push(mp);
+        }
+      });
+      setPartners(mergedPartners);
+    };
+
+    window.addEventListener('mock-db-changed', handleDbChange);
+
     const fetchSession = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -95,7 +137,17 @@ const AppContent: React.FC = () => {
             country: p.country
           })));
         } else {
-          setPartners(MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER));
+          // Fallback para mock local centralizado (mockDb)
+          const allUsers = mockDb.getUsers();
+          const partnersFromDb = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+          
+          const merged = [...partnersFromDb];
+          MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
+            if (!merged.find(p => p.email === mp.email)) {
+              merged.push(mp);
+            }
+          });
+          setPartners(merged);
         }
       } catch (err: any) {
         console.error("Erro de Acesso:", err);
@@ -106,7 +158,7 @@ const AppContent: React.FC = () => {
         } else {
           setError("Não foi possível conectar ao servidor real. As funcionalidades poderão estar limitadas a testes locais.");
         }
-        setPartners(MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER));
+        setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
       } finally {
         setLoading(false);
       }
@@ -116,16 +168,21 @@ const AppContent: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(mapUserFromSession(session?.user));
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('mock-db-changed', handleDbChange);
+    };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('agro_suste_products', JSON.stringify(products));
+    // Sincronizar produtos com o MockDb para persistência central
+    products.forEach(p => {
+        const existing = mockDb.getProducts();
+        if (!existing.find(ep => ep.id === p.id)) {
+            mockDb.saveProduct(p);
+        }
+    });
   }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('agro_suste_partners', JSON.stringify(partners));
-  }, [partners]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -174,28 +231,31 @@ const AppContent: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen flex flex-col bg-[#FAF9F6]">
-        <nav className="bg-[#1B5E20] text-white shadow-xl sticky top-0 z-50 border-b border-white/5">
-          <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-            <Link to="/" className="flex items-center gap-4 group">
-              <Logo className="w-12 h-12" color="white" />
+      <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
+        <nav className="glass bg-[#1B5E20]/90 text-white shadow-strong sticky top-0 z-[100] border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 md:h-20 flex justify-between items-center">
+            <Link to="/" className="flex items-center gap-2 md:gap-4 group">
+              <Logo className="w-8 h-8 md:w-12 md:h-12 group-hover:rotate-[15deg] transition-transform duration-500" color="white" />
               <div className="flex flex-col">
-                <span className="font-black text-xl tracking-tighter leading-none">Agro-Suste</span>
-                <span className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{t('app_tagline' as any)}</span>
+                <span className="font-black text-lg md:text-xl tracking-tighter leading-none">Agro-Suste</span>
+                <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest">{t('app_tagline' as any)}</span>
               </div>
             </Link>
 
             <div className="flex items-center gap-4 lg:gap-8">
-              <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
-                  className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer"
-                >
-                  {WORLD_LANGUAGES.map(lang => (
-                    <option key={lang.code} value={lang.code} className="text-black">{lang.code.toUpperCase()}</option>
-                  ))}
-                </select>
+              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/10">
+                {[
+                  { code: 'pt', label: 'PT' },
+                  { code: 'en', label: 'IN' }
+                ].map(l => (
+                  <button
+                    key={l.code}
+                    onClick={() => setLanguage(l.code)}
+                    className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${language === l.code ? 'bg-white text-[#1B5E20] shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
               </div>
 
               {user && (
@@ -217,44 +277,30 @@ const AppContent: React.FC = () => {
 
               {user ? (
                 <div className="flex items-center gap-3">
-                  <Link to="/profile" className="flex items-center gap-4 bg-white/5 pl-5 pr-2 py-2 rounded-3xl border border-white/10 hover:bg-white/10 transition-all group">
-                    <div className="flex flex-col items-end mr-1">
+                  <Link to="/profile" className="flex items-center gap-2 md:gap-4 bg-white/5 pl-3 md:pl-5 pr-2 py-1.5 md:py-2 rounded-2xl md:rounded-3xl border border-white/10 hover:bg-white/10 transition-all group">
+                    <div className="hidden sm:flex flex-col items-end mr-1">
                       <span className="text-[10px] font-black uppercase tracking-tight leading-none mb-1 text-white group-hover:text-green-300">{user.fullName.split(' ')[0]}</span>
                       <span className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40">{user.role}</span>
                     </div>
-                    <div className="w-10 h-10 bg-[#43A047] rounded-2xl flex items-center justify-center font-black text-sm shadow-strong">
+                    <div className="w-8 h-8 md:w-10 md:h-10 bg-[#43A047] rounded-xl md:rounded-2xl flex items-center justify-center font-black text-xs md:text-sm shadow-strong">
                       {user.fullName[0]}
                     </div>
                   </Link>
-                  <button onClick={handleLogout} className="bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/10 px-4 py-3 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all">
+                  <button onClick={handleLogout} className="bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/10 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] transition-all">
                     {t('nav_logout' as any)}
                   </button>
                 </div>
               ) : (
-                <Link to="/auth" className="bg-white text-[#1B5E20] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-gray-100 transition-all">
+                <Link to="/auth" className="bg-white text-[#1B5E20] px-5 md:px-8 py-2 md:py-3 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-strong hover:scale-105 transition-all">
                   {t('nav_auth' as any)}
                 </Link>
               )}
             </div>
           </div>
         </nav>
+        
+        <main className="flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10">
 
-        <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          {error && (
-            <div className="mb-8 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-4 duration-500">
-              <span className="text-xl">⚠️</span>
-              <div className="flex-grow">
-                <p className="text-xs font-black uppercase tracking-widest">{t('app_connection_error' as any) || 'Erro de Conexão'}</p>
-                <p className="text-[10px] font-medium opacity-70">{error.includes('servidor real') ? t('app_connection_failed' as any) : t('app_connection_failed_dns' as any)}</p>
-              </div>
-              <button
-                onClick={() => window.location.reload()}
-                className="bg-amber-200/50 hover:bg-amber-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                {t('app_try_again' as any) || 'Tentar Novamente'}
-              </button>
-            </div>
-          )}
           <Routes>
             <Route path="/" element={<RoleBasedHome />} />
             <Route path="/shop" element={<Shop addToCart={addToCart} products={products} />} />
@@ -264,9 +310,18 @@ const AppContent: React.FC = () => {
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 
-          <footer className="mt-20 border-t border-gray-100 py-12 text-center">
-            <Logo className="w-10 h-10 mx-auto mb-6 grayscale opacity-20" color="black" />
-            <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.5em]">{t('app_footer_rights' as any)}</p>
+          <footer className="mt-20 border-t border-[#2E5C4E]/20 py-12 text-center rounded-t-3xl bg-white shadow-soft relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#F9FBF8] to-white pointer-events-none z-0"></div>
+            <div className="relative z-10 max-w-4xl mx-auto px-6">
+              <Logo className="w-12 h-12 mx-auto mb-6 grayscale opacity-40 hover:opacity-100 hover:grayscale-0 transition-all duration-500" color="#2E5C4E" />
+              <p className="text-[14px] font-semibold text-[#2E5C4E] mb-2 capitalize">{t('footer_tagline')}</p>
+              <p className="text-[11px] font-medium text-[#5A6B5D] mb-6 max-w-md mx-auto leading-relaxed">
+                {t('footer_desc')}
+              </p>
+              <div className="border-t border-[#2E5C4E]/10 pt-6">
+                <p className="text-[10px] font-semibold text-gray-400">{t('footer_rights')}</p>
+              </div>
+            </div>
           </footer>
         </main>
         <AIAgent />

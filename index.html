@@ -22,30 +22,465 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Libre+Baskerville:wght@400;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet">
     <style>
+        :root {
+            /* Cores Primárias - Confiança e Natureza */
+            --primary-verde-folha: #2E5C4E;
+            --primary-verde-broto: #5B8C51;
+            
+            /* Cores Secundárias - A Terra e o Sol */
+            --secondary-terracota: #C87A53;
+            --secondary-amarelo-colheita: #F2C94C;
+            
+            /* Fundos e Superfícies */
+            --bg-light: #F9FBF8;
+            --bg-card: #FFFFFF;
+            
+            /* Tipografia */
+            --text-main: #2C3E2D;
+            --text-soft: #5A6B5D;
+
+            /* Variables mantidas para retrocompatibilidade */
+            --primary: var(--primary-verde-folha);
+            --primary-light: var(--primary-verde-broto);
+            --accent: var(--secondary-amarelo-colheita);
+            --bg: var(--bg-light);
+            --text: var(--text-main);
+            --glass: rgba(255, 255, 255, 0.8);
+        }
+
         body {
-            font-family: 'Outfit', system-ui, -apple-system, sans-serif;
-            background-color: #FAF9F6;
-            color: #263238;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
             margin: 0;
             padding: 0;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('/bg-agro.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .card, .btn, .modal-content, .bg-white {
+            border-radius: 16px;
+        }
+
+        /* Appliers that look for class containing some standard element */
+        .card, .modal-content {
+            border: 1px solid rgba(46, 92, 78, 0.1);
+            box-shadow: 0 8px 20px rgba(46, 92, 78, 0.04);
+        }
+
+        .btn-primary, button[class*="bg-[#1B5E20]"], button[class*="bg-primary"] {
+            background-color: var(--primary-verde-broto) !important;
+            border: none;
+            transition: all 0.25s ease;
+        }
+
+        .btn-primary:hover, button[class*="bg-[#1B5E20]"]:hover {
+            background-color: var(--primary-verde-folha) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(46, 92, 78, 0.25);
+        }
+
+        .impact-banner {
+            background: linear-gradient(105deg, var(--primary-verde-folha) 0%, #1F4238 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 24px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(46, 92, 78, 0.4);
+        }
+
+        .impact-number {
+            font-size: 2.2rem;
+            font-weight: 700;
+            font-family: 'Libre Baskerville', serif;
+            display: block;
+            color: var(--secondary-amarelo-colheita);
+            line-height: 1.2;
+        }
+
+        .impact-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 640px) {
+            .impact-banner {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0 8px;
+            width: 100%;
+        }
+
+        tbody tr {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #F4F9F2;
+            border-left: 4px solid var(--secondary-terracota);
+        }
+
+        th {
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.8rem;
+            color: var(--text-soft);
+            border-bottom: 2px solid var(--primary-verde-folha);
+            padding-bottom: 0.75rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 1rem;
+        }
+
+        /* Premium Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
         .shadow-soft {
-            box-shadow: 0 10px 30px -5px rgba(27, 94, 32, 0.08);
+            box-shadow: 0 10px 30px -5px rgba(46, 92, 78, 0.05), 0 4px 6px -2px rgba(46, 92, 78, 0.02);
         }
 
         .shadow-strong {
-            box-shadow: 0 20px 40px -10px rgba(27, 94, 32, 0.15);
+            box-shadow: 0 20px 40px -10px rgba(46, 92, 78, 0.12), 0 8px 16px -4px rgba(46, 92, 78, 0.08);
+        }
+
+        .glass {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, var(--primary-verde-folha) 0%, var(--primary-verde-broto) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         * {
-            transition: all 0.2s ease-in-out;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        input, button, select {
+            font-family: inherit;
+        }
+
+        /* Mobile full-bleed helper */
+        @media (max-width: 640px) {
+            .mobile-full {
+                margin-left: -1rem;
+                margin-right: -1rem;
+                width: calc(100% + 2rem);
+                border-radius: 0;
+            }
+        }
+        /* CARD DE PRODUTO - ESTRUTURA UNIFICADA */
+        .product-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(46, 92, 78, 0.08);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 1px solid rgba(46, 92, 78, 0.08);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .product-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 32px rgba(46, 92, 78, 0.12);
+            border-color: var(--primary-verde-broto);
+        }
+
+        .product-image-wrapper {
+            position: relative;
+            width: 100%;
+            padding-top: 75%;
+            overflow: hidden;
+            background: #F4F9F2;
+        }
+
+        .product-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .product-card:hover .product-image {
+            transform: scale(1.05);
+        }
+
+        .verified-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(46, 92, 78, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            text-transform: uppercase;
+        }
+
+        .verified-badge::before {
+            content: "✓";
+            font-size: 0.9rem;
+            margin-right: 4px;
+        }
+
+        .product-content {
+            padding: 1.25rem 1rem 1rem 1rem;
+            background: white;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .product-title {
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-verde-folha);
+            margin-bottom: 0.25rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .product-producer {
+            font-size: 0.85rem;
+            color: var(--text-soft);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .product-producer::before {
+            content: "🌱";
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .product-price-container {
+            margin-top: auto;
+            padding-top: 0.75rem;
+            border-top: 1px dashed rgba(46, 92, 78, 0.15);
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+
+        .product-price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary-terracota);
+            line-height: 1;
+        }
+
+        .product-price small {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: var(--text-soft);
+            margin-left: 2px;
+        }
+
+        .product-unit {
+            font-size: 0.8rem;
+            color: var(--text-soft);
+            text-transform: lowercase;
+        }
+
+        .product-action {
+            margin-top: 0.75rem;
+            width: 100%;
+            padding: 0.6rem;
+            background: transparent;
+            border: 1.5px solid var(--primary-verde-broto);
+            color: var(--primary-verde-broto);
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .product-action:hover {
+            background: var(--primary-verde-broto);
+            color: white;
+        }
+        /* ============================================= */
+        /* SEÇÃO PARCEIROS ESTRATÉGICOS - REDESIGN COMPLETO */
+        /* ============================================= */
+
+        .partners-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        @media (min-width: 640px) {
+            .partners-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .partners-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* CARD DO PARCEIRO - ESTILO "SELO DE QUALIDADE" */
+        .partner-card {
+            background: white;
+            border-radius: 24px;
+            padding: 1.75rem 1rem 1.5rem 1rem;
+            text-align: center;
+            border: 1px solid rgba(46, 92, 78, 0.08);
+            box-shadow: 0 10px 25px -5px rgba(46, 92, 78, 0.05);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Efeito de "Folha" sutil no hover */
+        .partner-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-verde-broto) 0%, var(--secondary-terracota) 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .partner-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 30px -8px rgba(46, 92, 78, 0.15);
+            border-color: var(--primary-verde-broto);
+        }
+
+        .partner-card:hover::before {
+            opacity: 1;
+        }
+
+        /* ÍCONE DO PARCEIRO - SUBSTITUI O TEXTO GENÉRICO */
+        .partner-icon {
+            width: 70px;
+            height: 70px;
+            background: #F4F9F2;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            color: var(--primary-verde-folha);
+            transition: all 0.2s;
+            font-size: 2rem;
+            font-style: normal;
+        }
+
+        .partner-card:hover .partner-icon {
+            background: var(--primary-verde-folha);
+            color: white;
+        }
+
+        /* NOME DO PARCEIRO */
+        .partner-name {
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary-verde-folha);
+            margin-bottom: 0.5rem;
+        }
+
+        /* TAG DE CATEGORIA */
+        .partner-tag {
+            background: rgba(200, 122, 83, 0.1);
+            color: var(--secondary-terracota);
+            padding: 0.25rem 1rem;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid rgba(200, 122, 83, 0.2);
+            margin-top: 0.5rem;
+            backdrop-filter: blur(4px);
+        }
+
+        /* VARIAÇÕES DE COR POR TIPO DE PARCEIRO */
+        .partner-card.finance .partner-icon { color: #C87A53; }
+        .partner-card.logistics .partner-icon { color: #5B8C51; }
+        .partner-card.ngo .partner-icon { color: #2E5C4E; }
     </style>
 </head>
 

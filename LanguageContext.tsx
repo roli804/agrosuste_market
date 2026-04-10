@@ -2,114 +2,97 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { translations, TranslationKey } from './translations';
 
-type Language = 'pt' | 'en' | 'fr' | 'zh' | 'es' | 'ar' | 'hi' | 'ru' | 'ja' | 'de' | 'it' | 'sw' | 'zu' | 'af' | 'ko' | 'tr' | 'vi' | 'th' | 'el' | 'nl' | 'pl' | 'uk' | 'fa' | 'bn' | 'pa' | 'jv' | 'ms' | 'he' | 'id' | 'no' | 'da' | 'fi' | 'cs' | 'hu' | 'ro' | 'bg' | 'sr' | 'hr' | 'sk';
+type Language = 'pt' | 'en';
 
 interface LanguageContextType {
   language: string;
   setLanguage: (lang: string) => void;
   t: (key: any) => string;
-  translateText: (text: string) => Promise<string>;
   translateBatch: (texts: string[]) => Promise<string[]>;
 }
 
 const LanguageContext = React.createContext<LanguageContextType | undefined>(undefined);
+
+// Cache simples para evitar chamadas duplicadas à IA
+const translationCache: Record<string, string> = {};
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<string>(() => {
     return localStorage.getItem('agro_suste_lang') || 'pt';
   });
 
-  const [translationsCache, setTranslationsCache] = useState<Record<string, Record<string, string>>>(() => {
-    const saved = localStorage.getItem('agro_suste_translations_cache');
-    try {
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const ai = useMemo(() => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("LanguageContext: GEMINI_API_KEY não configurado.");
-      return null;
-    }
-    return new GoogleGenAI({ apiKey });
+  const genAI = useMemo(() => {
+    const key = (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+    if (!key) return null;
+    return new GoogleGenAI(key);
   }, []);
 
   useEffect(() => {
     localStorage.setItem('agro_suste_lang', language);
   }, [language]);
 
-  useEffect(() => {
-    localStorage.setItem('agro_suste_translations_cache', JSON.stringify(translationsCache));
-  }, [translationsCache]);
-
-  const t = (key: TranslationKey): string => {
-    const langTranslations = translations[language] || translations['pt'];
-    return langTranslations[key] || translations['pt'][key] || key;
-  };
-
-  const translateText = async (text: string): Promise<string> => {
-    if (language === 'pt') return text;
-    if (translationsCache[language]?.[text]) return translationsCache[language][text];
-    if (!ai) return text;
-
-    try {
-      const model = ai.getGenerativeModel({ model: "gemini-3-flash-preview" });
-      const prompt = `Translate the following agricultural text to ${language}. Return ONLY the translation, no extra text: "${text}"`;
-      const result = await model.generateContent(prompt);
-      const translated = result.response.text();
-
-      setTranslationsCache(prev => ({
-        ...prev,
-        [language]: {
-          ...(prev[language] || {}),
-          [text]: translated
-        }
-      }));
-
-      return translated;
-    } catch (error) {
-      console.error("Translation error:", error);
-      return text;
-    }
-  };
-
   const translateBatch = async (texts: string[]): Promise<string[]> => {
-    if (language === 'pt' || !ai) return texts;
+    if (language === 'pt' || !genAI) return texts;
 
-    const results = [...texts];
-    const toTranslate = texts.filter(t => !translationsCache[language]?.[t]);
+    const results: string[] = [];
+    const ToTranslate: { text: string, originalIndex: number }[] = [];
 
-    if (toTranslate.length === 0) {
-      return texts.map(t => translationsCache[language][t]);
-    }
+    // 1. Verificar Cache
+    texts.forEach((text, i) => {
+      const cacheKey = `${language}:${text}`;
+      if (translationCache[cacheKey]) {
+        results[i] = translationCache[cacheKey];
+      } else {
+        ToTranslate.push({ text, originalIndex: i });
+      }
+    });
+
+    if (ToTranslate.length === 0) return results;
 
     try {
-      const model = ai.getGenerativeModel({ model: "gemini-3-flash-preview" });
-      const prompt = `Translate this list of agricultural terms to ${language}. Return ONLY a JSON array of strings in the same order: ${JSON.stringify(toTranslate)}`;
-      const result = await model.generateContent(prompt);
-      const translatedArray = JSON.parse(result.response.text());
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Translate the following agricultural market items from Portuguese to English. 
+                     Maintain professional trade terminology. Return ONLY the translated strings separated by '|||'.
+                     Items: ${ToTranslate.map(t => t.text).join(' ||| ')}`;
 
-      setTranslationsCache(prev => {
-        const newCache = { ...prev };
-        if (!newCache[language]) newCache[language] = {};
-        toTranslate.forEach((original, i) => {
-          newCache[language][original] = translatedArray[i];
-        });
-        return newCache;
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const translatedPart = response.text().split('|||').map(s => s.trim());
+
+      translatedPart.forEach((translated, i) => {
+        const originalInfo = ToTranslate[i];
+        const cacheKey = `${language}:${originalInfo.text}`;
+        translationCache[cacheKey] = translated;
+        results[originalInfo.originalIndex] = translated;
       });
 
-      return texts.map(t => translationsCache[language]?.[t] || t);
+      return results;
     } catch (error) {
-      console.error("Batch translation error:", error);
-      return texts;
+      console.error('Translation Error:', error);
+      return texts; // Fallback para o original em caso de erro
     }
+  };
+
+  const t = (key: string): string => {
+    const pt = translations['pt'] || {};
+    const en = translations['en'] || {};
+    
+    // 1. Try Selected Language
+    const currentSet = translations[language] || pt;
+    if (currentSet[key as TranslationKey]) return currentSet[key as TranslationKey];
+    
+    // 2. Fallback to Portuguese
+    if (pt[key as TranslationKey]) return pt[key as TranslationKey];
+    
+    // 3. Fallback to English
+    if (en[key as TranslationKey]) return en[key as TranslationKey];
+    
+    // 4. Last resort: Format key as text
+    return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, translateText, translateBatch }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, translateBatch }}>
       {children}
     </LanguageContext.Provider>
   );

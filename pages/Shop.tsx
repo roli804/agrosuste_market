@@ -75,26 +75,26 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-12 pb-24">
-      <aside className="w-full lg:w-72 space-y-8">
-        <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-gray-100">
+      <aside className="w-full lg:w-72 space-y-6 md:space-y-8">
+        <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-soft border border-gray-100">
           <h3 className="text-xs font-bold text-gray-400 mb-4 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-[#43A047] rounded-full"></span> {t('shop_search_title')}
+            <span className="w-1.5 h-1.5 bg-[#5B8C51] rounded-full"></span> {t('shop_search_title')}
           </h3>
           <input 
             type="text" 
             placeholder={t('shop_search_placeholder')}
-            className="w-full p-4 rounded-xl border-2 border-gray-50 bg-[#FAF9F6] text-gray-900 font-bold placeholder:text-gray-300 focus:border-[#43A047] focus:bg-white focus:outline-none transition-all"
+            className="w-full p-4 rounded-xl border-2 border-gray-50 bg-[#F9FBF8] text-gray-900 font-bold placeholder:text-gray-300 focus:border-[#5B8C51] focus:bg-white focus:outline-none transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-gray-100">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase">{t('shop_categories')}</h3>
+        <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-soft border border-gray-100">
+          <h3 className="text-xs font-bold text-gray-400 mb-4 ">{t('shop_categories')}</h3>
           <div className="space-y-2">
             <button 
               onClick={() => setSelectedCategory(null)}
-              className={`w-full text-left px-5 py-3 rounded-xl transition-all font-bold text-sm ${!selectedCategory ? 'bg-[#1B5E20] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`w-full text-left px-5 py-3 rounded-xl transition-all font-bold text-sm ${!selectedCategory ? 'bg-[#2E5C4E] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
             >
               {t('shop_all_products')}
             </button>
@@ -102,7 +102,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
               <button 
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`w-full text-left px-5 py-3 rounded-xl transition-all flex items-center gap-3 font-bold text-sm ${selectedCategory === cat.id ? 'bg-[#43A047] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`w-full text-left px-5 py-3 rounded-xl transition-all flex items-center gap-3 font-bold text-sm ${selectedCategory === cat.id ? 'bg-[#5B8C51] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
               >
                 <span className="text-lg">{cat.icon}</span> {translatedCategories[cat.id] || cat.name}
               </button>
@@ -112,8 +112,8 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
       </aside>
 
       <div className="flex-grow">
-        <div className="mb-10 px-4">
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight">
+        <div className="mb-6 md:mb-10 px-2 md:px-4">
+          <h2 className="text-2xl md:text-4xl font-semibold text-gray-900">
             {selectedCategory ? (translatedCategories[selectedCategory] || CATEGORIES.find(c => c.id === selectedCategory)?.name) : t('shop_market_title')}
           </h2>
           <p className="text-gray-400 text-sm font-medium mt-2">
@@ -126,28 +126,31 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
             {filteredProducts.map(product => {
               const trans = translatedProducts[product.id] || { name: product.name, desc: product.description };
               return (
-                <div key={product.id} className="bg-white rounded-[2rem] overflow-hidden shadow-soft border border-gray-100 hover:shadow-strong transition-all flex flex-col group">
-                  <div className="relative h-60 overflow-hidden">
-                    <img src={product.images[0]} alt={trans.name} className="w-full h-full object-cover" />
+                <div key={product.id} className="product-card group">
+                  <div className="product-image-wrapper">
+                    <img src={product.images[0]} alt={trans.name} className="product-image" />
                     {product.isDried && (
-                      <span className="absolute top-4 right-4 bg-[#795548] text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-md">Grão seco</span>
+                      <span className="absolute top-4 left-4 bg-[#795548] text-white text-[10px] px-3 py-1 rounded-full font-semibold shadow-md z-10">{t('home_dry_grain')}</span>
                     )}
+                    <span className="verified-badge">{t('profile_official')}</span>
                   </div>
-                  <div className="p-8 flex-grow flex flex-col">
-                    <h3 className="font-bold text-xl text-gray-900 mb-2 leading-tight">{trans.name}</h3>
-                    <p className="text-xs text-gray-400 font-medium line-clamp-2 mb-6 leading-relaxed">{trans.desc}</p>
-                    <div className="flex flex-col gap-4 pt-6 border-t border-gray-50 mt-auto">
-                      <div>
-                        <span className="text-2xl font-black text-[#43A047] tracking-tight">{product.price.toLocaleString()} MZN</span>
-                        <span className="text-[10px] text-gray-400 block font-bold">Por {product.unit}</span>
-                      </div>
-                      <button 
-                        onClick={() => addToCart(product)}
-                        className="w-full bg-[#43A047] hover:bg-[#1B5E20] text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-95 text-xs flex items-center justify-center gap-2"
-                      >
-                        🛒 {t('add_to_cart')}
-                      </button>
+                  <div className="product-content">
+                    <h3 className="product-title">{trans.name}</h3>
+                    <div className="product-producer">{t('profile_official')}</div>
+                    <p className="text-[10px] md:text-xs text-gray-400 font-medium line-clamp-2 mb-4 md:mb-6 leading-relaxed">{trans.desc}</p>
+                    <div className="product-price-container">
+                      <span className="product-price">
+                          {product.price.toLocaleString()}
+                          <small>MZN /{product.unit}</small>
+                      </span>
+                      <span className="product-unit font-semibold text-[#2E5C4E]">{product.stock} {t('stock_available')}</span>
                     </div>
+                    <button 
+                      onClick={() => addToCart(product)}
+                      className="product-action flex justify-center items-center gap-2 mt-2"
+                    >
+                      🛒 {t('add_to_cart')}
+                    </button>
                   </div>
                 </div>
               );
@@ -156,7 +159,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
         ) : (
           <div className="bg-white rounded-[3rem] p-24 text-center border border-dashed border-gray-200">
             <div className="text-6xl mb-6">🌾</div>
-            <h3 className="text-2xl font-black text-gray-900">{t('shop_no_products')}</h3>
+            <h3 className="text-2xl font-semibold text-gray-900">{t('shop_no_products')}</h3>
             <p className="text-gray-400 mt-2 font-medium text-sm">{t('shop_no_products_desc')}</p>
           </div>
         )}

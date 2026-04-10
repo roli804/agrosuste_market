@@ -7,10 +7,21 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://cmmvcpmmffciqqjgxttv.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
+// Melancolia de conexão: Se o URL for o padrão e estiver a falhar, avisamos na consola
+if (supabaseUrl.includes('cmmvcpmmffciqqjgxttv')) {
+  console.warn('[SUPABASE] Utilizando URL padrão que pode estar inativo. Verifique VITE_SUPABASE_URL.');
+}
+
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
+
+if (!supabase) {
+  console.error('[SUPABASE ERROR] Supabase não inicializado. Verifique as chaves no ficheiro .env');
+}

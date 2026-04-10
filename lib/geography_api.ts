@@ -1,16 +1,13 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
-const getAI = () => {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn("GEMINI_API_KEY não foi configurado. Recursos de IA estarão limitados.");
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+let ai: GoogleGenAI | null = null;
 
-const ai = getAI();
+if (!apiKey) {
+  console.warn("VITE_GEMINI_API_KEY não foi configurado. Recursos de IA estarão limitados.");
+} else {
+  ai = new GoogleGenAI({ apiKey });
+}
 
 export interface CountryPhoneInfo {
   prefix: string;

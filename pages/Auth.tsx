@@ -79,8 +79,11 @@ const Auth: React.FC = () => {
 
     try {
       if (mode === 'login') {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
+        
+        // Se o login no Supabase funcionar, ele segue o fluxo normal.
+        // Se falhar (ex: rede), cai no catch abaixo que agora é mais rigoroso.
       } else {
         const emailCheck = await verifyEmailCredibility(email);
         if (!emailCheck.isValid) throw new Error(emailCheck.reason);
@@ -88,6 +91,10 @@ const Auth: React.FC = () => {
         if (country === 'Moçambique' && (!posto || !localidade)) {
           throw new Error("Posto Administrativo e Localidade são obrigatórios para a estrutura nacional.");
         }
+
+        // --- REGRA DE OURO: ADMIN WHITELIST ---
+        const isAdminEmail = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(email.toLowerCase());
+        const finalRole = isAdminEmail ? UserRole.ADMIN : role;
 
         const currentPath = window.location.origin + window.location.pathname;
         const redirectUrl = currentPath.endsWith('/') ? `${currentPath}#/auth` : `${currentPath}/#/auth`;
@@ -101,7 +108,7 @@ const Auth: React.FC = () => {
               full_name: fullName,
               phone: `${phoneMeta.prefix}${phone}`,
               commercial_phone: `${phoneMeta.prefix}${commPhone}`,
-              role,
+              role: finalRole,
               entity_type: entityType,
               entity_name: entityType === EntityType.INDIVIDUAL ? fullName : entityName,
               province,
@@ -111,7 +118,7 @@ const Auth: React.FC = () => {
               country,
               status: 'active',
               balance: 0,
-              isApproved: false,
+              isApproved: isAdminEmail, // Admin já nasce aprovado
               linked_accounts: [],
               categories: selectedCategories,
               documents: (entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) ? {
@@ -120,8 +127,8 @@ const Auth: React.FC = () => {
                 estatuto,
                 boletim
               } : undefined,
-              logo: (role === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLogo : undefined,
-              location: (role === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLocation : undefined
+              logo: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLogo : undefined,
+              location: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLocation : undefined
             }
           }
         });
@@ -129,67 +136,96 @@ const Auth: React.FC = () => {
         setShowSuccessMessage(true);
       }
     } catch (err: any) {
+      // --- TRATAMENTO RIGOROSO DE FALLBACK (MOCK MODE) ---
       if (err.message === 'Failed to fetch' || err.message.includes('rede') || err.message.includes('network')) {
-        console.warn('Conexão com o Supabase falhou. Utilizando Mock Session para testes locais.');
+        console.warn('Utilizando BD Local (Mock) por falha de ligação ao servidor.');
 
-        // Simular um login/registo com sucesso criando um utilizador mock
-        const mockSessionUser = {
-          id: `local-mock-${Date.now()}`,
-          email: email,
-          user_metadata: {
-            full_name: fullName || email.split('@')[0],
-            phone: phone ? `${phoneMeta.prefix}${phone}` : '',
-            commercial_phone: commPhone ? `${phoneMeta.prefix}${commPhone}` : '',
-            role: role,
-            entity_type: entityType,
-            entity_name: entityType === EntityType.INDIVIDUAL ? (fullName || email) : entityName,
+        const usersInDb = mockDb.getUsers();
+        const existingUser = usersInDb.find(u => u.email === email);
+
+        if (mode === 'login') {
+          if (!existingUser) {
+            setError("Utilizador não encontrado. Por favor, registe-se primeiro.");
+            setLoading(false);
+            return;
+          }
+          // Simulação simples de senha (para testes locais, aceitamos a senha se o user existir)
+          const mockSessionUser = {
+            id: existingUser.id,
+            email: existingUser.email,
+            user_metadata: {
+              full_name: existingUser.fullName,
+              phone: existingUser.phone,
+              commercial_phone: existingUser.commercialPhone,
+              role: existingUser.role,
+              entity_type: existingUser.entityType,
+              entity_name: existingUser.entityName,
+              province: existingUser.province,
+              district: existingUser.district,
+              posto_administrativo: existingUser.posto,
+              localidade_bairro: existingUser.localidade,
+              country: existingUser.country,
+              status: existingUser.status,
+              balance: existingUser.balance
+            }
+          };
+          localStorage.setItem('mock_user', JSON.stringify(mockSessionUser));
+          mockDb.logActivity({
+            userId: existingUser.id,
+            userName: existingUser.fullName,
+            userRole: existingUser.role as any,
+            type: LogType.LOGIN,
+            description: `Utilizador ${existingUser.fullName} iniciou sessão.`
+          });
+          window.location.href = '/';
+          return;
+        } else {
+          // MODO SIGNUP
+          const isAdminEmail = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(email.toLowerCase());
+          const finalRole = isAdminEmail ? UserRole.ADMIN : role;
+
+          const newMockUser = {
+            id: `local-user-${Date.now()}`,
+            email: email,
+            fullName: fullName,
+            phone: `${phoneMeta.prefix}${phone}`,
+            commercialPhone: `${phoneMeta.prefix}${commPhone}`,
+            country: country,
             province: province,
             district: district,
-            posto_administrativo: posto,
-            localidade_bairro: localidade,
-            country: country,
+            role: finalRole,
+            entityType: entityType,
+            entityName: entityType === EntityType.INDIVIDUAL ? fullName : entityName,
+            posto: posto,
+            localidade: localidade,
             status: 'active',
+            isApproved: isAdminEmail,
+            linkedAccounts: [],
             balance: 0
-          }
-        };
+          };
 
-        localStorage.setItem('mock_user', JSON.stringify(mockSessionUser));
+          mockDb.saveUser(newMockUser);
+          mockDb.logActivity({
+            userId: newMockUser.id,
+            userName: newMockUser.fullName,
+            userRole: newMockUser.role as any,
+            type: LogType.SIGNUP,
+            description: `Novo utilizador ${newMockUser.fullName} (${newMockUser.role}) registado.`
+          });
 
-        // Persistir na base de dados mock para que outros componentes (como Dashboard) vejam
-        mockDb.saveUser({
-          id: mockSessionUser.id,
-          email: mockSessionUser.email,
-          fullName: mockSessionUser.user_metadata.full_name,
-          phone: mockSessionUser.user_metadata.phone,
-          commercialPhone: mockSessionUser.user_metadata.commercial_phone,
-          country: mockSessionUser.user_metadata.country,
-          province: mockSessionUser.user_metadata.province,
-          district: mockSessionUser.user_metadata.district,
-          role: mockSessionUser.user_metadata.role,
-          entityType: mockSessionUser.user_metadata.entity_type,
-          entityName: mockSessionUser.user_metadata.entity_name,
-          posto: mockSessionUser.user_metadata.posto_administrativo,
-          localidade: mockSessionUser.user_metadata.localidade_bairro,
-          status: 'active',
-          isApproved: false,
-          linkedAccounts: [],
-          balance: 0
-        });
+          localStorage.setItem('mock_user', JSON.stringify({
+            id: newMockUser.id,
+            email: newMockUser.email,
+            user_metadata: {
+              full_name: newMockUser.fullName,
+              role: newMockUser.role,
+              entity_name: newMockUser.entityName
+            }
+          }));
 
-        // Registar Log de Atividade
-        mockDb.logActivity({
-          userId: mockSessionUser.id,
-          userName: mockSessionUser.user_metadata.full_name,
-          userRole: mockSessionUser.user_metadata.role,
-          type: mode === 'signup' ? LogType.SIGNUP : LogType.LOGIN,
-          description: mode === 'signup'
-            ? `Utilizador ${mockSessionUser.user_metadata.full_name} registou-se via Mock Mode.`
-            : `Utilizador ${mockSessionUser.user_metadata.full_name} iniciou sessão via Mock Mode.`
-        });
-
-        // Recarregar a página para o App.tsx absorver a nova "sessão" mock
-        window.location.href = '/';
-        return;
+          window.location.href = '/';
+          return;
+        }
       }
       setError(err.message);
     } finally {
@@ -200,12 +236,12 @@ const Auth: React.FC = () => {
   if (showSuccessMessage) {
     return (
       <div className="max-w-xl mx-auto my-32 p-16 bg-white rounded-[5rem] shadow-strong text-center space-y-10 border-4 border-amber-50 animate-in zoom-in">
-        <div className="w-40 h-40 bg-amber-50 text-amber-600 rounded-[4rem] flex items-center justify-center text-7xl mx-auto">📬</div>
+        <div className="w-40 h-40 bg-amber-50 text-amber-600 rounded-[4rem] flex items-center justify-center text-7xl mx-auto">📨</div>
         <div className="space-y-4">
-          <h2 className="text-5xl font-black text-gray-900 tracking-tighter uppercase">{t('auth_success_title')}</h2>
-          <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.3em]">{t('auth_success_desc')}</p>
+          <h2 className="text-5xl font-semibold text-gray-900  ">{t('auth_success_title')}</h2>
+          <p className="text-gray-500 font-bold text-[10px]">{t('auth_success_desc')}</p>
         </div>
-        <button onClick={() => setShowSuccessMessage(false)} className="w-full bg-[#1B5E20] text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl">{t('auth_success_btn')}</button>
+        <button onClick={() => setShowSuccessMessage(false)} className="w-full bg-[#2E5C4E] text-white py-8 rounded-[2rem] font-semibold text-xs   shadow-2xl">{t('auth_success_btn')}</button>
       </div>
     );
   }
@@ -213,21 +249,21 @@ const Auth: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto my-6 px-4 pb-24">
       <div className="bg-white rounded-[4rem] shadow-strong overflow-hidden border border-gray-100">
-        <div className="bg-[#1B5E20] p-12 text-white text-center flex flex-col items-center relative">
+        <div className="bg-[#2E5C4E] p-12 text-white text-center flex flex-col items-center relative">
           <button
             type="button"
             onClick={() => setMode('login')}
-            className="absolute top-8 right-8 bg-white/10 hover:bg-white/20 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+            className="absolute top-8 right-8 bg-white/10 hover:bg-white/20 px-6 py-2 rounded-xl text-[9px] font-semibold   transition-all"
           >
             {t('nav_auth')}
           </button>
           <Logo className="w-20 h-20 mb-4" color="white" />
-          <h2 className="text-4xl font-black tracking-tighter uppercase">{mode === 'login' ? t('auth_login_title') : t('auth_signup_title')}</h2>
-          <p className="text-[10px] font-black opacity-40 mt-4 uppercase tracking-[0.4em]">{t('auth_tagline')}</p>
+          <h2 className="text-4xl font-semibold  ">{mode === 'login' ? t('auth_login_title') : t('auth_signup_title')}</h2>
+          <p className="text-[10px] font-semibold opacity-40 mt-4">{t('auth_tagline')}</p>
         </div>
 
         <form onSubmit={handleAuth} className="p-12 space-y-10">
-          {error && <div className="bg-red-50 text-red-600 text-[10px] font-black p-6 rounded-3xl border border-red-100 uppercase tracking-widest animate-bounce">⚠️ {error}</div>}
+          {error && <div className="bg-red-50 text-red-600 text-[10px] font-semibold p-6 rounded-3xl border border-red-100   animate-bounce">⚠️ {error}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             {mode === 'signup' && (
@@ -303,9 +339,10 @@ const Auth: React.FC = () => {
                   </div>
                 )}
 
+                 {/* Documentação Empresarial */}
                 {(entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) && (
                   <div className="md:col-span-2 bg-amber-50/50 p-8 rounded-[2.5rem] border border-amber-100 space-y-6">
-                    <h4 className="text-[10px] font-black text-amber-800 uppercase tracking-widest">{t('auth_business_docs')}</h4>
+                    <h4 className="text-[10px] font-semibold text-amber-800">{t('auth_business_docs')}</h4>
                     <p className="text-[9px] text-amber-600 font-medium leading-relaxed">{t('auth_business_docs_desc')}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input required className="auth-input text-xs" placeholder={t('auth_nuit')} value={nuit} onChange={e => setNuit(e.target.value)} />
@@ -320,13 +357,13 @@ const Auth: React.FC = () => {
                   <div className="md:col-span-2 space-y-4">
                     <label className="auth-label">{t('auth_logo_upload')}</label>
                     <div className="flex items-center gap-4">
-                      <div className="w-24 h-24 bg-gray-50 rounded-3xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-300 hover:border-[#43A047] hover:text-[#43A047] transition-all cursor-pointer relative overflow-hidden group">
+                      <div className="w-24 h-24 bg-gray-50 rounded-3xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-300 hover:border-[#5B8C51] hover:text-[#5B8C51] transition-all cursor-pointer relative overflow-hidden group">
                         {partnerLogo ? (
                           <img src={partnerLogo} className="w-full h-full object-cover" />
                         ) : (
                           <>
                             <Upload size={24} />
-                            <span className="text-[8px] font-black uppercase mt-2">Upload</span>
+                            <span className="text-[8px] font-semibold  mt-2">Upload</span>
                           </>
                         )}
                         <input
@@ -362,8 +399,8 @@ const Auth: React.FC = () => {
                               prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
                             );
                           }}
-                          className={`p-4 rounded-2xl border-2 transition-all text-[10px] font-black uppercase flex items-center gap-2 ${selectedCategories.includes(cat.id)
-                            ? 'border-[#43A047] bg-green-50 text-[#1B5E20]'
+                          className={`p-4 rounded-2xl border-2 transition-all text-[10px] font-semibold  flex items-center gap-2 ${selectedCategories.includes(cat.id)
+                            ? 'border-[#5B8C51] bg-green-50 text-[#2E5C4E]'
                             : 'border-gray-100 bg-white text-gray-400'
                             }`}
                         >
@@ -378,7 +415,7 @@ const Auth: React.FC = () => {
                 <div className="space-y-2">
                   <label className="auth-label">{t('auth_phone_personal')}</label>
                   <div className="flex gap-2">
-                    <span className="bg-gray-100 p-4 rounded-2xl font-black text-xs text-gray-400">{phoneMeta.prefix}</span>
+                    <span className="bg-gray-100 p-4 rounded-2xl font-semibold text-xs text-gray-400">{phoneMeta.prefix}</span>
                     <input required className="auth-input" placeholder={phoneMeta.example} value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} />
                   </div>
                 </div>
@@ -386,8 +423,8 @@ const Auth: React.FC = () => {
                 <div className="space-y-2">
                   <label className="auth-label">{t('auth_phone_comm')}</label>
                   <div className="flex gap-2">
-                    <span className="bg-gray-100 p-4 rounded-2xl font-black text-xs text-gray-400">{phoneMeta.prefix}</span>
-                    <input required className="auth-input" placeholder="84 000 0000" value={commPhone} onChange={e => setCommPhone(e.target.value.replace(/\D/g, ''))} />
+                    <span className="bg-gray-100 p-4 rounded-2xl font-semibold text-xs text-gray-400">{phoneMeta.prefix}</span>
+                    <input required className="auth-input" placeholder={t('profile_ex_phone')} value={commPhone} onChange={e => setCommPhone(e.target.value.replace(/\D/g, ''))} />
                   </div>
                 </div>
               </>
@@ -395,7 +432,7 @@ const Auth: React.FC = () => {
 
             <div className="space-y-2">
               <label className="auth-label">{t('auth_email')}</label>
-              <input type="email" required className="auth-input" placeholder="exemplo@agro.co.mz" value={email} onChange={e => setEmail(e.target.value)} />
+              <input type="email" required className="auth-input" placeholder={t('auth_email_placeholder')} value={email} onChange={e => setEmail(e.target.value)} />
             </div>
 
             <div className="space-y-2 relative">
@@ -405,14 +442,14 @@ const Auth: React.FC = () => {
                   type={showPassword ? "text" : "password"}
                   required
                   className="auth-input pr-14"
-                  placeholder="••••••••"
+                  placeholder={t('auth_pass_placeholder')}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#43A047] transition-all"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5B8C51] transition-all"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -421,19 +458,19 @@ const Auth: React.FC = () => {
           </div>
 
           <div className="pt-10 space-y-6">
-            <button type="submit" disabled={loading} className="w-full bg-[#43A047] hover:bg-[#1B5E20] text-white font-black py-8 rounded-[2.5rem] shadow-strong transition-all text-xs uppercase tracking-[0.3em]">
-              {loading ? 'A PROCESSAR...' : mode === 'login' ? t('auth_login_btn') : t('auth_signup_btn')}
+            <button type="submit" disabled={loading} className="w-full bg-[#5B8C51] hover:bg-[#2E5C4E] text-white font-semibold py-8 rounded-[2.5rem] shadow-strong transition-all text-xs">
+              {loading ? t('auth_processing') : mode === 'login' ? t('auth_login_btn') : t('auth_signup_btn')}
             </button>
-            <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-black text-gray-400 hover:text-[#43A047] uppercase tracking-widest">
+            <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-semibold text-gray-400 hover:text-[#5B8C51]">
               {mode === 'login' ? t('auth_no_account') : t('auth_has_account')}
             </button>
           </div>
         </form>
       </div>
       <style>{`
-        .auth-label { display: block; font-size: 9px; font-weight: 900; color: #B0BEC5; text-transform: uppercase; letter-spacing: 0.2em; margin-left: 0.5rem; }
-        .auth-input { width: 100%; padding: 1.25rem; border-radius: 1.75rem; border: 3px solid #F5F5F5; background-color: #FAFAFA; font-size: 0.9rem; font-weight: 800; color: #1B5E20; outline: none; }
-        .auth-input:focus { border-color: #43A047; background-color: white; }
+        .auth-label { display: block; font-size: 9px; font-weight: 900; color: #B0BEC5; text-transform: none; letter-spacing: 0.2em; margin-left: 0.5rem; }
+        .auth-input { width: 100%; padding: 1.25rem; border-radius: 1.75rem; border: 3px solid #F5F5F5; background-color: #FAFAFA; font-size: 0.9rem; font-weight: 800; color: #2E5C4E; outline: none; }
+        .auth-input:focus { border-color: #5B8C51; background-color: white; }
       `}</style>
     </div>
   );
