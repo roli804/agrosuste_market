@@ -14,7 +14,26 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        display: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#2E7D32',
+                            light: '#4CAF50',
+                            soft: '#A5D6A7'
+                        },
+                        accent: '#D4A373',
+                        earth: {
+                            DEFAULT: '#8D6E63',
+                            light: '#F5F5DC',
+                            sand: '#EFEFE8'
+                        },
+                        neutral: {
+                            light: '#E0E0E0',
+                            medium: '#757575',
+                            dark: '#263238'
+                        }
                     }
                 }
             }
@@ -22,37 +41,44 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Libre+Baskerville:wght@400;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <style>
         :root {
-            /* Cores Primárias - Confiança e Natureza */
-            --primary-verde-folha: #2E5C4E;
-            --primary-verde-broto: #5B8C51;
+            /* Novo Padrão - Confiança e Sustentabilidade */
+            --primary-verde-folha: #2E7D32;
+            --primary-verde-broto: #4CAF50;
+            --primary-verde-claro: #A5D6A7;
             
-            /* Cores Secundárias - A Terra e o Sol */
-            --secondary-terracota: #C87A53;
-            --secondary-amarelo-colheita: #F2C94C;
+            /* Cores Secundárias */
+            --secondary-terracota: #D4A373;
+            --secondary-amarelo-colheita: #D4A373; /* Fallback accent */
             
             /* Fundos e Superfícies */
-            --bg-light: #F9FBF8;
+            --bg-light: #F5F5DC;
             --bg-card: #FFFFFF;
             
-            /* Tipografia */
-            --text-main: #2C3E2D;
-            --text-soft: #5A6B5D;
+            /* Tipografia e Neutros */
+            --text-main: #263238;
+            --text-soft: #757575;
+            --border-light: #E0E0E0;
 
             /* Variables mantidas para retrocompatibilidade */
             --primary: var(--primary-verde-folha);
             --primary-light: var(--primary-verde-broto);
-            --accent: var(--secondary-amarelo-colheita);
+            --accent: var(--secondary-terracota);
             --bg: var(--bg-light);
             --text: var(--text-main);
-            --glass: rgba(255, 255, 255, 0.8);
+            --glass: rgba(255, 255, 255, 0.85);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-main);
         }
 
         body {
-            font-family: 'Outfit', sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-light);
             color: var(--text-main);
             margin: 0;
@@ -74,19 +100,19 @@
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
-            opacity: 0.15;
+            opacity: 0.05;
             pointer-events: none;
             z-index: -1;
         }
 
         .card, .btn, .modal-content, .bg-white {
-            border-radius: 16px;
+            border-radius: 12px;
         }
 
         /* Appliers that look for class containing some standard element */
         .card, .modal-content {
-            border: 1px solid rgba(46, 92, 78, 0.1);
-            box-shadow: 0 8px 20px rgba(46, 92, 78, 0.04);
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
         .btn-primary, button[class*="bg-[#1B5E20]"], button[class*="bg-primary"] {

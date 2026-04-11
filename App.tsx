@@ -14,6 +14,7 @@ import { supabase } from './lib/supabase';
 
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import AIAgent from './components/AIAgent';
+import { mockDb } from './lib/mock_db';
 
 const AppContent: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -232,18 +233,18 @@ const AppContent: React.FC = () => {
   return (
     <HashRouter>
       <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
-        <nav className="glass bg-[#1B5E20]/90 text-white shadow-strong sticky top-0 z-[100] border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 md:h-20 flex justify-between items-center">
+        <nav className="bg-white text-[#263238] sticky top-0 z-[100] border-b border-[#E0E0E0]">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 h-[70px] flex justify-between items-center">
             <Link to="/" className="flex items-center gap-2 md:gap-4 group">
-              <Logo className="w-8 h-8 md:w-12 md:h-12 group-hover:rotate-[15deg] transition-transform duration-500" color="white" />
+              <Logo className="w-8 h-8 md:w-10 md:h-10 group-hover:rotate-[15deg] transition-transform duration-500" color="#2E7D32" />
               <div className="flex flex-col">
-                <span className="font-black text-lg md:text-xl tracking-tighter leading-none">Agro-Suste</span>
-                <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest">{t('app_tagline' as any)}</span>
+                <span className="font-poppins font-bold text-lg md:text-xl tracking-tight leading-none text-[#263238]">Agro-Suste</span>
+                <span className="text-[7px] md:text-[9px] font-medium opacity-60 uppercase tracking-widest">{t('app_tagline' as any)}</span>
               </div>
             </Link>
 
             <div className="flex items-center gap-4 lg:gap-8">
-              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/10">
+              <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
                 {[
                   { code: 'pt', label: 'PT' },
                   { code: 'en', label: 'IN' }
@@ -251,7 +252,7 @@ const AppContent: React.FC = () => {
                   <button
                     key={l.code}
                     onClick={() => setLanguage(l.code)}
-                    className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${language === l.code ? 'bg-white text-[#1B5E20] shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                    className={`px-3 py-1 rounded-lg text-[9px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold' : 'text-gray-400 hover:text-[#2E7D32]'}`}
                   >
                     {l.label}
                   </button>
@@ -259,17 +260,17 @@ const AppContent: React.FC = () => {
               </div>
 
               {user && (
-                <div className="hidden lg:flex items-center gap-8 mr-8">
-                  <Link to="/" className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-all">{t('nav_home' as any)}</Link>
-                  <Link to="/shop" className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-all">{t('nav_shop' as any)}</Link>
-                  <Link to="/relatorios-publicos" className="text-[10px] font-black uppercase tracking-widest text-emerald-300 hover:text-white transition-all">{t('nav_transparency' as any)}</Link>
+                <div className="hidden lg:flex items-center gap-6 mr-4">
+                  <Link to="/" className="text-[11px] font-medium uppercase tracking-wider text-[#263238] hover:text-[#2E7D32] transition-all">{t('nav_home' as any)}</Link>
+                  <Link to="/shop" className="text-[11px] font-medium uppercase tracking-wider text-[#263238] hover:text-[#2E7D32] transition-all">{t('nav_shop' as any)}</Link>
+                  <Link to="/relatorios-publicos" className="text-[11px] font-medium uppercase tracking-wider text-[#4CAF50] hover:text-[#2E7D32] transition-all">{t('nav_transparency' as any)}</Link>
                 </div>
               )}
 
-              <Link to="/checkout" className="bg-white/10 p-3 rounded-2xl hover:bg-white/20 relative transition-all">
+              <Link to="/checkout" className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl hover:bg-gray-100 text-[#263238] relative transition-all">
                 <span className="text-xl">🛒</span>
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#43A047] text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-[#1B5E20]">
+                  <span className="absolute -top-1 -right-1 bg-[#2E7D32] text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
                     {cart.length}
                   </span>
                 )}
@@ -277,23 +278,28 @@ const AppContent: React.FC = () => {
 
               {user ? (
                 <div className="flex items-center gap-3">
-                  <Link to="/profile" className="flex items-center gap-2 md:gap-4 bg-white/5 pl-3 md:pl-5 pr-2 py-1.5 md:py-2 rounded-2xl md:rounded-3xl border border-white/10 hover:bg-white/10 transition-all group">
+                  <Link to="/profile" className="flex items-center gap-2 md:gap-4 bg-white pl-3 md:pl-5 pr-2 py-1.5 md:py-2 rounded-xl md:rounded-2xl border border-[#E0E0E0] hover:bg-gray-50 transition-all group">
                     <div className="hidden sm:flex flex-col items-end mr-1">
-                      <span className="text-[10px] font-black uppercase tracking-tight leading-none mb-1 text-white group-hover:text-green-300">{user.fullName.split(' ')[0]}</span>
-                      <span className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40">{user.role}</span>
+                      <span className="text-[11px] font-medium uppercase tracking-tight leading-none mb-1 text-[#263238] group-hover:text-[#2E7D32]">{user.fullName.split(' ')[0]}</span>
+                      <span className="text-[8px] font-medium uppercase tracking-wider text-[#757575]">{user.role}</span>
                     </div>
-                    <div className="w-8 h-8 md:w-10 md:h-10 bg-[#43A047] rounded-xl md:rounded-2xl flex items-center justify-center font-black text-xs md:text-sm shadow-strong">
+                    <div className="w-8 h-8 md:w-9 md:h-9 bg-[#2E7D32] text-white rounded-lg md:rounded-xl flex items-center justify-center font-bold text-xs md:text-sm shadow-sm">
                       {user.fullName[0]}
                     </div>
                   </Link>
-                  <button onClick={handleLogout} className="bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/10 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] transition-all">
+                  <button onClick={handleLogout} className="bg-transparent hover:bg-red-50 text-red-500 border border-red-200 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-medium uppercase tracking-wider transition-all">
                     {t('nav_logout' as any)}
                   </button>
                 </div>
               ) : (
-                <Link to="/auth" className="bg-white text-[#1B5E20] px-5 md:px-8 py-2 md:py-3 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-strong hover:scale-105 transition-all">
-                  {t('nav_auth' as any)}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to="/auth" className="bg-transparent border border-[#E0E0E0] text-[#263238] hover:bg-gray-50 px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-[11px] font-medium uppercase tracking-wider transition-all">
+                    Login
+                  </Link>
+                  <Link to="/auth?mode=register" className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-4 md:px-6 py-2 border border-transparent rounded-xl text-[10px] md:text-[11px] font-medium uppercase tracking-wider shadow-sm transition-all hidden sm:block">
+                    {t('nav_auth' as any)}
+                  </Link>
+                </div>
               )}
             </div>
           </div>
@@ -310,16 +316,47 @@ const AppContent: React.FC = () => {
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 
-          <footer className="mt-20 border-t border-[#2E5C4E]/20 py-12 text-center rounded-t-3xl bg-white shadow-soft relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#F9FBF8] to-white pointer-events-none z-0"></div>
-            <div className="relative z-10 max-w-4xl mx-auto px-6">
-              <Logo className="w-12 h-12 mx-auto mb-6 grayscale opacity-40 hover:opacity-100 hover:grayscale-0 transition-all duration-500" color="#2E5C4E" />
-              <p className="text-[14px] font-semibold text-[#2E5C4E] mb-2 capitalize">{t('footer_tagline')}</p>
-              <p className="text-[11px] font-medium text-[#5A6B5D] mb-6 max-w-md mx-auto leading-relaxed">
-                {t('footer_desc')}
-              </p>
-              <div className="border-t border-[#2E5C4E]/10 pt-6">
-                <p className="text-[10px] font-semibold text-gray-400">{t('footer_rights')}</p>
+          <footer className="mt-20 border-t border-[#E0E0E0] pt-16 pb-8 bg-[#F1F8F4]">
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+              <div className="col-span-1 md:col-span-1">
+                <Logo className="w-10 h-10 mb-4" color="#2E7D32" />
+                <h3 className="font-poppins font-bold text-[#263238] text-lg mb-2">AgroConnect</h3>
+                <p className="text-[13px] text-[#757575] leading-relaxed">
+                  Conectando produtores rurais a mercados internacionais, promovendo sustentabilidade e transparência.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">A Plataforma</h4>
+                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
+                  <Link to="/" className="hover:text-[#2E7D32] transition-colors">Sobre Nós</Link>
+                  <Link to="/relatorios-publicos" className="hover:text-[#2E7D32] transition-colors">{t('nav_transparency' as any) || 'Transparência'}</Link>
+                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Sustentabilidade</a>
+                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Parceiros</a>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">Soluções</h4>
+                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
+                  <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">Comprar Produtos</Link>
+                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Vender (Produtores)</a>
+                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Logística</a>
+                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Investimento Verde</a>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">Contato</h4>
+                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
+                  <p>geral@agroconnect.com</p>
+                  <p>+258 84 000 0000</p>
+                  <p className="mt-2">Maputo, Moçambique</p>
+                </div>
+              </div>
+            </div>
+            <div className="max-w-7xl mx-auto px-6 border-t border-[#E0E0E0] pt-8 flex flex-col md:flex-row justify-between items-center text-[12px] text-[#757575]">
+              <p>© {new Date().getFullYear()} AgroConnect. Todos os direitos reservados.</p>
+              <div className="flex gap-4 mt-4 md:mt-0">
+                <a href="#" className="hover:text-[#2E7D32]">Termos de Uso</a>
+                <a href="#" className="hover:text-[#2E7D32]">Privacidade</a>
               </div>
             </div>
           </footer>

@@ -71,30 +71,30 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
   return (
     <div className="space-y-16 pb-20">
       {/* Hero Section */}
-      <section className="relative h-[400px] md:h-[550px] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-strong group mx-2 md:mx-0">
+      <section className="relative h-[400px] md:h-[550px] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-sm group mx-2 md:mx-0 border border-[#E0E0E0]">
         <img
           src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1600"
           alt="Agricultura em Moçambique"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col items-center justify-center text-center p-10 text-white">
-          <div className="bg-[#5B8C51]/40 backdrop-blur-sm px-5 py-2 rounded-full text-xs font-semibold mb-6 border border-white/20">
+        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/80 to-white/40 flex flex-col items-center justify-center text-center p-10 text-[#263238]">
+          <div className="bg-[#4CAF50]/10 text-[#2E7D32] px-5 py-2 rounded-full text-xs font-semibold mb-6 border border-[#4CAF50]/20">
             {t('hero_badge')}
           </div>
           <div className="flex items-center gap-4 md:gap-6 mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-1000">
-            <Logo className="w-12 h-12 md:w-20 md:h-20 drop-shadow-2xl" color="white" />
-            <h1 className="text-3xl md:text-7xl font-semibold drop-shadow-2xl text-white mb-4">
-              {t('hero_title').split(' ')[0]} <span className="text-[#5B8C51]">{t('hero_title').split(' ')[1]}</span>
+            <Logo className="w-12 h-12 md:w-16 md:h-16" color="#2E7D32" />
+            <h1 className="font-poppins text-3xl md:text-6xl font-bold text-[#263238] mb-4 tracking-tight">
+              {t('hero_title').split(' ')[0]} <span className="text-[#2E7D32]">{t('hero_title').split(' ')[1]}</span>
             </h1>
           </div>
-          <p className="text-sm md:text-xl max-w-2xl mb-8 md:mb-12 drop-shadow-lg font-medium opacity-90 leading-relaxed">
+          <p className="text-sm md:text-xl max-w-2xl mb-8 md:mb-12 font-regular text-[#757575] leading-relaxed">
             {t('hero_subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row gap-5">
-            <Link to="/shop" className="bg-[#5B8C51] hover:bg-[#2E5C4E] text-white px-10 py-4 rounded-2xl font-bold transition-all shadow-xl text-sm">
+            <Link to="/shop" className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-10 py-4 rounded-xl font-semibold transition-all shadow-md text-sm">
               {t('hero_cta_shop')}
             </Link>
-            <Link to="/auth?role=seller" className="bg-white/10 backdrop-blur-md hover:bg-white/20 text-white border border-white/30 px-10 py-4 rounded-2xl font-bold transition-all text-sm">
+            <Link to="/auth?role=seller" className="bg-transparent hover:bg-white text-[#2E7D32] border-2 border-[#2E7D32] px-10 py-4 rounded-xl font-semibold transition-all text-sm">
               {t('hero_cta_auth')}
             </Link>
           </div>
@@ -238,25 +238,25 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
         </div>
       </section>
 
-      {/* Info Agro-Suste - Refinado para Elegância */}
-      <section className="bg-[#2E5C4E] rounded-[3.5rem] p-12 md:p-20 grid grid-cols-1 md:grid-cols-3 gap-12 text-white shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
-
-        <div className="space-y-6 relative z-10">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-3xl backdrop-blur-md border border-white/10 shadow-inner">🛡️</div>
-          <h3 className="font-semibold text-xl">{t('info_official_title')}</h3>
-          <p className="text-xs opacity-70 leading-relaxed font-medium">{t('info_official_desc')}</p>
+      {/* Info Agro-Suste - Transformado para Tons Suaves (Bege/Terrosos) */}
+      <section className="bg-[#F5F5DC] rounded-[3.5rem] p-12 md:p-20 grid grid-cols-1 md:grid-cols-3 gap-12 text-[#263238] shadow-sm relative overflow-hidden border border-[#E0E0E0]">
+        
+        <div className="space-y-6 relative z-10 flex flex-col items-center text-center md:items-start md:text-left">
+          <div className="w-16 h-16 bg-[#2E7D32]/10 rounded-2xl flex items-center justify-center text-3xl font-black text-[#2E7D32] border border-[#2E7D32]/20">🛡️</div>
+          <h3 className="font-poppins font-bold text-2xl text-[#2E7D32]">{t('info_official_title')}</h3>
+          <p className="text-sm text-[#757575] leading-relaxed font-regular">{t('info_official_desc')}</p>
         </div>
-        <div className="space-y-6 relative z-10">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-3xl backdrop-blur-md border border-white/10 shadow-inner">💸</div>
-          <h3 className="font-semibold text-xl">{t('info_payment_title')}</h3>
-          <p className="text-xs opacity-70 leading-relaxed font-medium">{t('info_payment_desc')}</p>
+        
+        <div className="space-y-6 relative z-10 flex flex-col items-center text-center md:items-start md:text-left">
+          <div className="w-16 h-16 bg-[#2E7D32]/10 rounded-2xl flex items-center justify-center text-3xl font-black text-[#2E7D32] border border-[#2E7D32]/20">💸</div>
+          <h3 className="font-poppins font-bold text-2xl text-[#2E7D32]">{t('info_payment_title')}</h3>
+          <p className="text-sm text-[#757575] leading-relaxed font-regular">{t('info_payment_desc')}</p>
         </div>
-        <div className="space-y-6 relative z-10">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-3xl backdrop-blur-md border border-white/10 shadow-inner">🌍</div>
-          <h3 className="font-semibold text-xl">{t('info_global_title')}</h3>
-          <p className="text-xs opacity-70 leading-relaxed font-medium">{t('info_global_desc')}</p>
+        
+        <div className="space-y-6 relative z-10 flex flex-col items-center text-center md:items-start md:text-left">
+          <div className="w-16 h-16 bg-[#2E7D32]/10 rounded-2xl flex items-center justify-center text-3xl font-black text-[#2E7D32] border border-[#2E7D32]/20">🌍</div>
+          <h3 className="font-poppins font-bold text-2xl text-[#2E7D32]">{t('info_global_title')}</h3>
+          <p className="text-sm text-[#757575] leading-relaxed font-regular">{t('info_global_desc')}</p>
         </div>
       </section>
     </div>
