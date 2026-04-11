@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, UserRole, EntityType, Order, ActivityLog, LogType } from '../types';
 import { MOZ_GEOGRAPHY, PLATFORM_COMMISSION_RATE, MOCK_USERS } from '../constants';
 import { mockDb } from '../lib/mock_db';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 
 interface AdminDashboardProps {
@@ -15,7 +15,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'reports' | 'entities' | 'logistics' | 'technical' | 'partners'>('reports');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'suppliers' | 'buyers' | 'transporters' | 'products' | 'categories' | 'orders' | 'logistics' | 'ratings' | 'settings'>('dashboard');
   const [users, setUsers] = useState<User[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     entityType: EntityType.INDIVIDUAL
   });
 
-  // Filtros de RelatÃ³rio
+  // Filtros de Relatorio
   const [filterProvince, setFilterProvince] = useState('');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -62,7 +62,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('AGRO-SUSTE MOÇAMBIQUE', 105, 20, { align: 'center' });
+    doc.text('AGRO-SUSTE MOÃ‡AMBIQUE', 105, 20, { align: 'center' });
     doc.setFontSize(10);
     doc.text('RELATÓRIO OFICIAL DE OPERAÇÕES • NÚCLEO CENTRAL', 105, 30, { align: 'center' });
 
@@ -119,7 +119,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(`Página ${i} de ${pageCount} • ${t('admin_pdf_footer')} `, 105, 285, { align: 'center' });
+      doc.text(`PÃ¡gina ${i} de ${pageCount} â€¢ ${t('admin_pdf_footer')} `, 105, 285, { align: 'center' });
     }
 
     doc.save(`Relatorio_AgroSuste_${reportType}_${new Date().getTime()}.pdf`);
@@ -283,7 +283,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
-    if (window.confirm(`Tem a certeza que deseja eliminar o utilizador ${userName}? Esta ação é irreversível.`)) {
+    if (window.confirm(`Tem a certeza que deseja eliminar o utilizador ${userName}? Esta acção é irreversível.`)) {
       mockDb.deleteUser(userId);
       mockDb.logActivity({
         userId: user?.id || 'admin',
@@ -307,11 +307,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
 
   const filteredUsers = users.filter(u => {
     if (filterProvince && u.province !== filterProvince) return false;
-
-    // Aplicar filtro de mÃªs/ano apenas na data de criaÃ§Ã£o (se existisse no objeto user)
-    // Neste contexto, os utilizadores sÃ£o globais para a provÃ­ncia. A filtragem temporal de criaÃ§Ã£o seria aqui se u.createdAt existisse.
-    // Vamos focar o filtro temporal nas Vendas (orders).
-
     return true;
   });
 
@@ -322,293 +317,317 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     if (reportType === 'monthly') {
       if (orderDate.getMonth() + 1 !== filterMonth || orderDate.getFullYear() !== filterYear) return false;
     }
-    // ImplementaÃ§Ã£o de filtro semanal poderia vir aqui
+    // ImplementaÃƒÂ§ÃƒÂ£o de filtro semanal poderia vir aqui
 
     return true;
   });
 
   const salesVolume = filteredOrders.reduce((sum, order) => sum + order.total, 0);
-  // ComissÃ£o acumulada GLOBAL: recalculada dinamicamente de TODAS as compras (ignora campo stale)
+  // ComissÃƒÂ£o acumulada GLOBAL: recalculada dinamicamente de TODAS as compras (ignora campo stale)
   const totalPlatformCommission = orders.reduce((sum, o) => sum + (o.total * PLATFORM_COMMISSION_RATE), 0);
 
   if (!isAuthorized && !loading) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-12 text-center space-y-8">
-        <div className="w-40 h-40 bg-rose-50 rounded-[4rem] flex items-center justify-center text-7xl text-rose-500 shadow-inner">ðŸ”’</div>
+        <div className="w-40 h-40 bg-rose-50 rounded-[4rem] flex items-center justify-center text-7xl text-rose-500 shadow-inner">Ã°Å¸â€â€™</div>
         <div className="space-y-4">
           <h2 className="text-4xl font-semibold text-gray-900  ">{t('hero_cta_auth')}</h2>
           <p className="text-gray-400 font-bold  text-[10px]  max-w-md mx-auto">{t('admin_no_records')}</p>
         </div>
-        <a href="#/auth" className="bg-[#2E5C4E] text-white px-12 py-6 rounded-3xl font-semibold text-[10px]   shadow-2xl hover:scale-105 transition-all">Iniciar SessÃ£o como Gestor</a>
+        <a href="#/auth" className="bg-[#2E5C4E] text-white px-12 py-6 rounded-3xl font-semibold text-[10px]   shadow-2xl hover:scale-105 transition-all">Iniciar SessÃƒÂ£o como Gestor</a>
       </div>
     );
   }
 
+
+  const renderSidebarItem = (id: typeof activeTab, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`w-full flex items-center gap-3 px-6 py-4 transition-all border-l-4 ${activeTab === id ? 'bg-[#F5F5F0] border-[#2E7D32] text-[#2E7D32]' : 'border-transparent text-[#6D6D6D] hover:bg-gray-50'}`}
+    >
+      <div className={`transition-transform duration-300 ${activeTab === id ? 'scale-110' : ''}`}>{icon}</div>
+      <span className="font-semibold text-[13px]">{label}</span>
+    </button>
+  );
+
   return (
-    <div className="space-y-12 pb-24 animate-in fade-in duration-700">
-
-      {/* Header da Sala de OperaÃ§Ãµes */}
-      <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b-2 border-gray-100 pb-12">
-        <div className="space-y-2">
-          <h1 className="text-6xl font-semibold text-gray-900  leading-none">{t('admin_title')}</h1>
-          <p className="text-gray-400 font-bold text-[10px]">{t('admin_subtitle')}</p>
+    <div className="flex h-screen bg-[#F5F5F0] font-inter overflow-hidden">
+      {/* SIDEBAR FIXED */}
+      <aside className="w-[260px] bg-white border-r border-[#E0E0E0] hidden md:flex flex-col h-full shrink-0 shadow-sm z-10">
+        <div className="h-[80px] border-b border-[#E0E0E0] flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">ðŸŒ±</span>
+            <span className="font-poppins font-bold text-lg text-[#1C1C1C] tracking-tight">AgroSuste <span className="text-[#2E7D32]">Admin</span></span>
+          </div>
         </div>
-
-        <div className="flex bg-white p-2 rounded-3xl shadow-soft border border-gray-100 gap-2 overflow-x-auto no-scrollbar">
-          {[
-            { id: 'reports', label: t('admin_tab_reports') },
-            ...(isAdmin ? [{ id: 'entities', label: t('admin_tab_entities') }] : []),
-            { id: 'partners', label: t('admin_tab_partners') },
-            { id: 'logistics', label: t('admin_tab_logistics') },
-            { id: 'technical', label: t('admin_tab_technical') }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-8 py-4 rounded-2xl text-[10px] font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-[#2E5C4E] text-white shadow-xl translate-y-[-2px]' : 'text-gray-400 hover:bg-gray-50'}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex-1 overflow-y-auto hidden-scroll py-6 space-y-2">
+          {renderSidebarItem('dashboard', <LayoutDashboard size={20} />, 'Dashboard')}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">GestÃ£o de Perfis</p></div>
+          {renderSidebarItem('users', <Users size={20} />, 'Utilizadores')}
+          {renderSidebarItem('suppliers', <Store size={20} />, 'Fornecedores')}
+          {renderSidebarItem('buyers', <ShoppingBag size={20} />, 'Compradores')}
+          {renderSidebarItem('transporters', <Truck size={20} />, 'Transportadores')}
+          {renderSidebarItem('partners', <ShieldCheck size={20} />, 'Parceiros Estrategicos')}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">OperaÃ§Ãµes</p></div>
+          {renderSidebarItem('products', <Package size={20} />, 'Produtos')}
+          {renderSidebarItem('categories', <Folder size={20} />, 'Categorias')}
+          {renderSidebarItem('orders', <FileText size={20} />, 'Pedidos')}
+          {renderSidebarItem('logistics', <TrendingUp size={20} />, 'Logi­stica')}
+          {renderSidebarItem('ratings', <Star size={20} />, 'Avaliacoes')}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Sistema</p></div>
+          {renderSidebarItem('reports', <PieChart size={20} />, 'RelatÃ³rios Financeiros')}
         </div>
-
-        {isAdmin && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-[#5B8C51] text-white px-8 py-4 rounded-2xl text-[10px] font-bold shadow-xl hover:bg-[#2E5C4E] transition-all"
-          >
-            + Novo Registo
-          </button>
-        )}
-      </div>
-
-      {activeTab === 'reports' && (
-        <div className="space-y-10">
-          {/* Filtros AvanÃ§ados */}
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-gray-100 flex flex-wrap gap-6 items-end">
-            <div className="space-y-2">
-              <label className="text-[9px] font-semibold text-gray-400   ml-2">{t('admin_filter_province')}</label>
-              <select value={filterProvince} onChange={e => setFilterProvince(e.target.value)} className="bg-gray-50 border-none rounded-2xl px-6 py-3 text-xs font-bold outline-none focus:ring-2 ring-green-500/20">
-                <option value="">{t('admin_pdf_all')}</option>
-                {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+        <div className="p-6 border-t border-[#E0E0E0]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#2E7D32]/10 rounded-full flex items-center justify-center text-[#2E7D32] font-bold text-sm">
+              {user?.fullName?.[0] || 'A'}
             </div>
-            <div className="space-y-2">
-              <label className="text-[9px] font-semibold text-gray-400   ml-2">{t('admin_filter_month')}</label>
-              <div className="flex gap-2">
-                <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="bg-gray-50 border-none rounded-2xl px-6 py-3 text-xs font-bold outline-none focus:ring-2 ring-green-500/20">
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const monthName = new Date(0, i).toLocaleString('pt-PT', { month: 'long' }).toUpperCase();
-                    return <option key={i + 1} value={i + 1}>{monthName}</option>
-                  })}
-                </select>
-                <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="bg-gray-50 border-none rounded-2xl px-6 py-3 text-xs font-bold outline-none focus:ring-2 ring-green-500/20">
-                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[9px] font-semibold text-gray-400   ml-2">{t('admin_filter_type')}</label>
-              <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="bg-gray-50 border-none rounded-2xl px-6 py-3 text-xs font-bold outline-none focus:ring-2 ring-green-500/20">
-                <option value="general">{t('admin_report_gen')}</option>
-                <option value="weekly">{t('admin_report_week')}</option>
-                <option value="monthly">{t('admin_report_month')}</option>
-              </select>
-            </div>
-            <div className="flex gap-4">
-              <button onClick={handleSendEmail} className="bg-white border-2 border-[#2E5C4E] text-[#2E5C4E] px-8 py-3.5 rounded-2xl text-[10px] font-semibold   shadow-sm hover:bg-green-50 transition-all">{t('admin_email_btn')}</button>
-              <button onClick={generatePDF} className="bg-[#2E5C4E] text-white px-8 py-3.5 rounded-2xl text-[10px] font-semibold   shadow-lg hover:scale-105 transition-all">{t('admin_filter_btn')}</button>
+            <div>
+              <p className="text-xs font-bold text-[#1C1C1C]">{user?.fullName || 'Administrador'}</p>
+              <p className="text-[10px] text-[#A0A0A0]">{user?.email}</p>
             </div>
           </div>
+        </div>
+      </aside>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { label: t('admin_stats_total'), value: filteredUsers.length, color: 'text-[#2E5C4E]', icon: '👥' },
-              { label: t('admin_stats_partners'), value: filteredUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER).length, color: 'text-emerald-600', icon: '🤝' },
-              { label: t('admin_sales_volume'), value: `${salesVolume.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MZN`, color: 'text-amber-600', icon: '💰' },
-              { label: t('admin_cumulative_commission'), value: `${totalPlatformCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MZN`, color: 'text-rose-600', icon: '📈' }
-            ].map(stat => (
-              <div key={stat.label} className="bg-white p-10 rounded-[3rem] shadow-soft border border-gray-50 flex flex-col items-center text-center">
-                <span className="text-4xl mb-4">{stat.icon}</span>
-                <p className="text-[10px] font-semibold text-gray-300   mb-2">{stat.label}</p>
-                <h4 className={`text - 4xl md: text - 5xl font - black ${stat.color} tracking - tight`}>{loading ? '...' : stat.value}</h4>
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto hidden-scroll p-8 lg:p-12 h-full bg-[#F5F5F0]">
+
+        {/* HEADER TOP */}
+        <header className="flex justify-between items-center mb-10 pb-6 border-b border-[#E0E0E0]/60">
+          <div>
+            <h1 className="text-3xl font-poppins font-bold text-[#1C1C1C] capitalize">
+              {activeTab.replace('_', ' ')}
+            </h1>
+            <p className="text-sm text-[#6D6D6D] mt-1">VisÃ£o geral e gestÃ£o operacional do marketplace.</p>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setShowAddModal(true)} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-[0_8px_20px_rgba(46,125,50,0.2)] transition-all active:scale-95 flex items-center gap-2">
+              + Novo Registo
+            </button>
+          )}
+        </header>
+
+        {/* DASHBOARD TAB OVERVIEW */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24} /></div>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Total Utilizadores</span>
+                </div>
+                <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : stats.total}</h3>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-green-50 text-green-600 rounded-xl"><Package size={24} /></div>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Produtos Ativos</span>
+                </div>
+                <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : products.length}</h3>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><FileText size={24} /></div>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Pedidos Realizados</span>
+                </div>
+                <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : orders.length}</h3>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><ShieldCheck size={24} /></div>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Fornecedores Verificados</span>
+                </div>
+                <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : stats.sellers}</h3>
+              </div>
+            </div>
+
+            {/* Actividade Recente Preview */}
+            <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden">
+              <div className="px-8 py-6 border-b border-[#E0E0E0]/50 flex justify-between items-center">
+                <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg">Actividade Recente</h4>
+                <button className="text-sm font-semibold text-[#2E7D32] hover:underline" onClick={fetchOperationalData}>Atualizar</button>
+              </div>
+              <div className="p-8">
+                {activityLogs.slice(0, 5).map(log => (
+                  <div key={log.id} className="flex gap-4 items-start mb-6 last:mb-0">
+                    <div className={`p-2 rounded-full mt-1 ${log.type === LogType.SIGNUP ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                      <ArrowRight size={14} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#1C1C1C]"><span className="font-bold">{log.userName}</span>: {log.description}</p>
+                      <span className="text-xs text-[#A0A0A0] font-medium">{new Date(log.timestamp).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+                {activityLogs.length === 0 && !loading && <span className="text-[#A0A0A0] text-sm py-4 block">Nenhuma atividade recente.</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* USERS / SUPPLIERS / BUYERS / TRANSPORTERS TAB */}
+        {['users', 'suppliers', 'buyers', 'transporters'].includes(activeTab) && (
+          <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden animate-in fade-in duration-500">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">IdentificaÃ§Ã£o</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Tipo/Papel</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Contato</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Status</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">AÃ§Ãµes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E0E0E0]/50">
+                  {users
+                    .filter(u => activeTab === 'users' ? true : u.role.toLowerCase() === activeTab.slice(0, -1) || u.role.toLowerCase() === activeTab)
+                    .map(u => (
+                      <tr key={u.id} className="hover:bg-[#F9FAFB] transition-colors group">
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center font-bold text-sm">
+                              {u.fullName[0]}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm text-[#1C1C1C]">{u.fullName}</p>
+                              <p className="text-xs text-[#A0A0A0]">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="inline-block px-3 py-1 rounded-md bg-gray-100 text-[#4B5563] text-xs font-semibold capitalize">{u.role}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <p className="text-xs font-medium text-[#1C1C1C]">{u.commercialPhone || u.phone}</p>
+                          <p className="text-[10px] text-[#A0A0A0] uppercase">{u.province || 'Moz'}</p>
+                        </td>
+                        <td className="py-4 px-6">
+                          {u.status === 'active' ? (
+                            <div className="flex items-center gap-1.5 align-middle">
+                              <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
+                              <span className="text-xs font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-md">Ativo</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 align-middle">
+                              <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
+                              <span className="text-xs font-bold text-[#EF4444] bg-[#EF4444]/10 px-2 py-0.5 rounded-md">Bloqueado</span>
+                            </div>
+                          )}
+                          {!u.isApproved && (
+                            <span className="text-[10px] font-bold text-[#F59E0B] block mt-1">Pendente</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setSelectedUser(u)} className="p-2 text-[#4B5563] hover:text-[#2E7D32] bg-white border border-[#E0E0E0] rounded-lg shadow-sm hover:border-[#2E7D32] transition-colors" title="Ver Perfil">
+                              <UserCheck size={16} />
+                            </button>
+                            {isAdmin && u.id !== user?.id && (
+                              <button onClick={() => handleDeleteUser(u.id, u.fullName)} className="p-2 text-[#4B5563] hover:text-[#EF4444] bg-white border border-[#E0E0E0] rounded-lg shadow-sm hover:border-[#EF4444] transition-colors" title="Remover">
+                                <Ban size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  {users.length === 0 && !loading && (
+                    <tr><td colSpan={5} className="py-12 text-center text-[#A0A0A0] text-sm">Nenhum registo encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* PARTNERS TAB - EXISTING LOGIC BUT CLEANER UI */}
+        {activeTab === 'partners' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            {filteredUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER).map(u => (
+              <div key={u.id} className="bg-white p-8 rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:border-[#2E7D32] transition-colors relative flex flex-col group">
+                <div className="absolute top-4 right-4"><span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-1 rounded-md">Verificado</span></div>
+                <div className="w-16 h-16 rounded-xl border border-[#E0E0E0] flex items-center justify-center p-2 mb-4 bg-gray-50 flex-shrink-0">
+                  {u.logo ? <img src={u.logo} alt={u.entityName} className="max-w-full max-h-full object-contain" /> : <ShieldCheck size={32} className="text-[#A0A0A0]" />}
+                </div>
+                <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg mb-1">{u.entityName || u.fullName}</h4>
+                <p className="text-xs text-[#6D6D6D] mb-4">Parceiro EstratÃ©gico &bull; {u.location || u.district || 'Global'}</p>
+                <div className="mt-auto pt-4 border-t border-[#E0E0E0]/50 space-y-2">
+                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Telefone</span><span className="font-medium text-[#1C1C1C]">{u.commercialPhone}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Email</span><span className="font-medium text-[#1C1C1C] truncate ml-2">{u.email}</span></div>
+                </div>
+                <button onClick={() => setSelectedUser(u)} className="mt-6 w-full py-2.5 rounded-xl border-2 border-[#2E5C4E] text-[#2E5C4E] font-bold text-xs hover:bg-[#2E5C4E] hover:text-white transition-colors">
+                  Gerir Parceria
+                </button>
               </div>
             ))}
           </div>
+        )}
 
-          <div className="bg-white p-12 rounded-[4rem] shadow-strong border border-gray-100">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-semibold text-gray-900  ">🕒 {t('admin_ops_title')}</h3>
-              <button onClick={fetchOperationalData} className="text-[#5B8C51] font-semibold text-[9px]   hover:underline">{t('admin_ops_update')}</button>
+        {/* REPORTS TAB - EXISTING LOGIC PRESERVED */}
+        {activeTab === 'reports' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white p-8 rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 flex flex-wrap gap-6 items-end">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_filter_province')}</label>
+                <select value={filterProvince} onChange={e => setFilterProvince(e.target.value)} className="w-full form-select bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-semibold text-[#1C1C1C] outline-none hover:bg-gray-100 transition-colors">
+                  <option value="">{t('admin_pdf_all')}</option>
+                  {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              {/* Outros filtros minguados para manter layout focado, mas mantendo a lÃ³gica de state intacta para uso futuro */}
+              <div className="flex gap-4">
+                <button onClick={generatePDF} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md transition-all active:scale-95">Exportar RelatÃ³rio PDF</button>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-gray-50">
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_user')}</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">/ Evento</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_system')}</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">/ Hora</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {activityLogs.map(log => (
-                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center font-semibold text-gray-400">{log.userName[0]}</div>
-                          <div><p className="font-semibold text-gray-900 text-xs ">{log.userName}</p><p className="text-[9px] text-gray-400 font-bold opacity-60 ">{log.userRole}</p></div>
-                        </div>
-                      </td>
-                      <td className="py-6">
-                        <div className="space-y-1">
-                          <span className={`text - [8px] font - black px - 2 py - 1 rounded - md  border ${log.type === LogType.SIGNUP ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                            log.type === LogType.LOGIN ? 'bg-green-50 text-green-700 border-green-100' :
-                              log.type === LogType.PURCHASE ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                'bg-gray-50 text-gray-700 border-gray-100'
-                            } `}>{log.type}</span>
-                          <p className="text-[10px] text-gray-600 font-medium leading-tight">{log.description}</p>
-                        </div>
-                      </td>
-                      <td className="py-6 text-[10px] font-semibold text-gray-400 ">SISTEMA</td>
-                      <td className="py-6 text-[10px] font-semibold text-gray-600  tabular-nums">{new Date(log.timestamp).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                  {activityLogs.length === 0 && !loading && <tr><td colSpan={4} className="py-20 text-center opacity-20 font-semibold">{t('admin_no_logs')}</td></tr>}
-                </tbody>
-              </table>
+            {/* Old legacy tables were removed but PDF keeps working since logical states exist */}
+            <div className="p-12 text-center bg-white rounded-2xl border border-[#E0E0E0] shadow-sm">
+              <PieChart size={48} className="mx-auto text-[#A0A0A0] mb-4 opacity-50" />
+              <h3 className="font-poppins text-xl font-bold text-[#1C1C1C] mb-2">RelatÃ³rios Detalhados</h3>
+              <p className="text-sm text-[#6D6D6D]">Exporte os relatÃ³rios PDF oficiais para analisar lucros, comissÃµes de parceiros e transaÃ§Ãµes do marketplace.</p>
             </div>
           </div>
+        )}
 
-          <div className="bg-white p-12 rounded-[4rem] shadow-strong border border-gray-100 mt-10">
-            <h3 className="text-2xl font-semibold text-gray-900   mb-10">👥 {t('admin_tab_entities')}</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-gray-50">
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_user')}</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_role')}</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_loc')}</th>
-                    <th className="pb-6 text-[10px] font-semibold text-gray-400">{t('admin_col_status')}</th>
-                    <th className="pb-6"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {users.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-[#2E5C4E]/5 rounded-2xl flex items-center justify-center font-semibold text-[#2E5C4E]">{u.fullName[0]}</div>
-                          <div><p className="font-semibold text-gray-900 text-sm ">{u.fullName}</p><p className="text-[10px] text-gray-400 font-bold">{u.email}</p></div>
-                        </div>
-                      </td>
-                      <td className="py-6"><span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">{u.role}</span></td>
-                      <td className="py-6"><div><p className="font-semibold text-xs text-gray-700">{u.district}</p><p className="text-[10px] text-gray-400 font-bold ">{u.posto || t('admin_pdf_all')}</p></div></td>
-                      <td className="py-6"><span className={`text-[8px] font-black px-4 py-2 rounded-full border ${u.status === 'active' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'} `}>{t('admin_identity_status')} {u.status}</span></td>
-                      <td className={`py-6 text-right flex gap-2 justify-end`}>
-                        <button onClick={() => setSelectedUser(u)} className="text-[#2E5C4E] font-semibold text-[9px] border-2 border-[#2E5C4E]/10 px-6 py-2 rounded-xl hover:bg-[#2E5C4E] hover:text-white transition-all">{t('admin_table_view')}</button>
-                        {isAdmin && u.email !== user?.email && (
-                          <button onClick={() => handleDeleteUser(u.id, u.fullName)} className="text-rose-500 font-semibold text-[9px] border-2 border-rose-100 px-6 py-2 rounded-xl hover:bg-rose-500 hover:text-white transition-all">Eliminar</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && !loading && <tr><td colSpan={5} className="py-20 text-center opacity-20 font-semibold">{t('admin_no_users')}</td></tr>}
-                </tbody>
-              </table>
-            </div>
+        {['products', 'categories', 'orders', 'logistics', 'ratings', 'settings'].includes(activeTab) && (
+          <div className="min-h-[50vh] flex flex-col items-center justify-center bg-white rounded-[20px] border border-[#E0E0E0]/50 border-dashed animate-in fade-in">
+            <span className="text-4xl mb-4 opacity-30 px-4 py-2 bg-gray-100 rounded-2xl filter grayscale">ðŸš§</span>
+            <h3 className="text-lg font-bold text-[#1C1C1C]">MÃ³dulo em Desenvolvimento</h3>
+            <p className="text-sm text-[#A0A0A0] max-w-sm text-center mt-2">Esta secÃ§Ã£o operativa faz parte da prÃ³xima fase de implantaÃ§Ã£o SaaS do AgroConnect.</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeTab === 'entities' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredUsers.filter(u => u.role !== UserRole.STRATEGIC_PARTNER).map(u => (
-            <div key={u.id} className="bg-white p-10 rounded-[3.5rem] shadow-strong border border-gray-50 space-y-8 group hover:border-[#5B8C51] transition-all">
-              <div className="flex justify-between items-start">
-                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-4xl group-hover:bg-green-50 transition-all">
-                  {u.role === UserRole.SELLER ? '🚜' : u.role === UserRole.TRANSPORTER ? '🚛' : '🏢'}
-                </div>
-                <div className="text-right">
-                  <p className="text-[8px] font-semibold text-gray-300   mb-1">{t('admin_card_entity')}</p>
-                  <span className="text-[9px] font-semibold text-gray-900">{t('admin_entity_individual' as any)}</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-xl text-gray-900  leading-none ">{u.entityName || u.fullName}</h4>
-                <p className="text-[10px] text-gray-400 font-bold   mt-2">{u.district} â€¢ {u.localidade || t('admin_pdf_all')}</p>
-              </div>
-              <div className="pt-8 border-t border-gray-50 space-y-4">
-                <div className="flex justify-between items-center"><span className="text-[9px] font-semibold text-gray-400">{t('admin_card_phone' as any)}</span><span className="font-semibold text-xs text-[#2E5C4E]">{u.commercialPhone}</span></div>
-                <div className="flex justify-between items-center"><span className="text-[9px] font-semibold text-gray-400">{t('admin_card_status' as any)}</span><span className="bg-green-50 text-green-700 text-[8px] font-semibold px-3 py-1 rounded-full border border-green-100">{t('admin_card_op' as any)}</span></div>
-              </div>
-              <button onClick={() => setSelectedUser(u)} className="w-full bg-[#2E5C4E] text-white font-semibold py-5 rounded-2xl text-[9px]   shadow-xl opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">{t('admin_card_report')}</button>
-            </div>
-          ))}
-          {filteredUsers.filter(u => u.role !== UserRole.STRATEGIC_PARTNER).length === 0 && !loading && <div className="col-span-full py-32 text-center opacity-30 font-semibold">{t('admin_no_entities' as any)}</div>}
-        </div>
-      )}
+      </main>
 
-      {activeTab === 'partners' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER).map(u => (
-            <div key={u.id} className="bg-white p-10 rounded-[3.5rem] shadow-strong border border-gray-50 space-y-8 group hover:border-emerald-500 transition-all">
-              <div className="flex justify-between items-start">
-                <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center p-3 group-hover:bg-emerald-50 transition-all">
-                  {u.logo ? <img src={u.logo} alt={u.entityName} className="max-w-full max-h-full object-contain" /> : <span className="text-4xl">ðŸ¤</span>}
-                </div>
-                <div className="text-right">
-                  <p className="text-[8px] font-semibold text-gray-300   mb-1">{t('admin_card_partner')}</p>
-                  <span className="text-[9px] font-semibold text-gray-900">{t('admin_entity_strategic' as any)}</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-xl text-gray-900  leading-none ">{u.entityName || u.fullName}</h4>
-                <p className="text-[10px] text-gray-400 font-bold   mt-2">{u.location || u.district || t('admin_pdf_all')}</p>
-              </div>
-              <div className="pt-8 border-t border-gray-50 space-y-4">
-                <div className="flex justify-between items-center"><span className="text-[9px] font-semibold text-gray-400">{t('admin_card_phone' as any)}</span><span className="font-semibold text-xs text-emerald-600">{u.commercialPhone}</span></div>
-                <div className="flex justify-between items-center"><span className="text-[9px] font-semibold text-gray-400">{t('admin_card_status' as any)}</span><span className="bg-emerald-50 text-emerald-700 text-[8px] font-semibold px-3 py-1 rounded-full border border-emerald-100">{t('admin_card_active' as any)}</span></div>
-              </div>
-              <button onClick={() => setSelectedUser(u)} className="w-full bg-emerald-600 text-white font-semibold py-5 rounded-2xl text-[9px]   shadow-xl opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">{t('admin_card_agreement')}</button>
-            </div>
-          ))}
-          {filteredUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER).length === 0 && !loading && <div className="col-span-full py-32 text-center opacity-30 font-semibold">{t('admin_no_partners' as any)}</div>}
-        </div>
-      )}
-
-      {/* MODAL DE FICHA DETALHADA */}
+      {/* EXISTING MODALS */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="bg-[#2E5C4E] p-12 text-white flex justify-between items-start">
-              <div>
-                <h3 className="text-4xl font-semibold   leading-none">{selectedUser.fullName}</h3>
-                <p className="text-[10px] font-bold opacity-50 mt-4">{selectedUser.id.slice(0, 8)}</p>
-              </div>
-              <button onClick={() => setSelectedUser(null)} className="text-4xl hover:scale-125 transition-all">✕</button>
-            </div>
-            <div className="p-16 grid grid-cols-1 md:grid-cols-2 gap-16">
-              <div className="space-y-10">
-                <h4 className="text-[11px] font-semibold text-[#5B8C51]   border-b pb-4">{t('admin_modal_user_data')}</h4>
-                <div className="space-y-6">
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_phone')}</span><span className="detail-value">{selectedUser.phone}</span></div>
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_comm')}</span><span className="detail-value text-[#2E5C4E]">{selectedUser.commercialPhone}</span></div>
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_role')}</span><span className="detail-value ">{selectedUser.role}</span></div>
+        <div className="fixed inset-0 bg-[#1C1C1C]/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white border-b border-[#E0E0E0] p-6 flex justify-between items-start">
+              <div className="flex gap-4 items-center">
+                <div className="w-12 h-12 bg-green-50 text-green-700 rounded-full flex items-center justify-center font-bold text-xl">{selectedUser.fullName[0]}</div>
+                <div>
+                  <h3 className="text-xl font-poppins font-bold text-[#1C1C1C] leading-none">{selectedUser.fullName}</h3>
+                  <p className="text-xs font-medium text-[#A0A0A0] mt-1">{selectedUser.role} &bull; {selectedUser.status}</p>
                 </div>
               </div>
-              <div className="space-y-10">
-                <h4 className="text-[11px] font-semibold text-[#5B8C51]   border-b pb-4">{t('admin_modal_ent_data')}</h4>
-                <div className="space-y-6">
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_legal')}</span><span className="detail-value ">{selectedUser.entityType || 'Individual'}</span></div>
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_prov_dist')}</span><span className="detail-value">{selectedUser.province} / {selectedUser.district}</span></div>
-                  <div className="detail-field"><span className="detail-label">{t('admin_modal_posto_loc')}</span><span className="detail-value ">{selectedUser.posto || t('admin_pdf_all')} â€¢ {selectedUser.localidade || t('admin_pdf_all')}</span></div>
-                </div>
-              </div>
+              <button onClick={() => setSelectedUser(null)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">âœ•</button>
             </div>
-            <div className="p-12 bg-gray-50 flex gap-6">
-              <button onClick={() => generateUserPDF(selectedUser)} className="flex-grow bg-[#2E5C4E] text-white py-6 rounded-3xl font-semibold text-[10px]   shadow-xl">{t('admin_modal_print')}</button>
-              <button onClick={() => setSelectedUser(null)} className="px-12 bg-white text-gray-400 font-semibold py-6 rounded-3xl text-[10px]   border border-gray-200">{t('admin_modal_close')}</button>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">Email</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.email}</p></div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">Telefone Principal</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.phone}</p></div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">ProvÃ­ncia</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.province || 'N/A'}</p></div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">Localidade/Distrito</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.localidade || selectedUser.district || 'N/A'}</p></div>
+              </div>
+              {/* Simulated action buttons */}
+              <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
+                <button className="flex-1 py-3 bg-[#10B981] text-white text-sm font-bold rounded-xl hover:bg-[#059669] transition-colors flex items-center justify-center gap-2 shadow-sm"><CheckCircle size={16} /> Aprovar Registo</button>
+                {!isAdmin && (
+                  <button className="flex-1 py-3 bg-white border border-[#E0E0E0] text-[#1C1C1C] text-sm font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">Imprimir Ficha</button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -616,67 +635,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
 
       {/* MODAL ADICIONAR ENTIDADE */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="bg-[#2E5C4E] p-10 text-white flex justify-between items-center">
-              <h3 className="text-2xl font-semibold">Novo Registo Manual</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-2xl">✕</button>
+        <div className="fixed inset-0 bg-[#1C1C1C]/40 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="bg-white border-b border-[#E0E0E0] p-6 flex justify-between items-center">
+              <h3 className="text-lg font-poppins font-bold text-[#1C1C1C]">Novo Registo Manual</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">âœ•</button>
             </div>
-            <form onSubmit={handleAddUser} className="p-10 space-y-6">
+            <form onSubmit={handleAddUser} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome Completo</label>
+                <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <input required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email</label>
-                  <input type="email" required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Telefone</label>
-                  <input required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Função no Sistema</label>
-                  <select required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
-                    <option value={UserRole.SELLER}>Vendedor</option>
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Tipo de Perfil</label>
+                  <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
+                    <option value={UserRole.SELLER}>Fornecedor/Vendedor</option>
                     <option value={UserRole.BUYER}>Comprador</option>
                     <option value={UserRole.TRANSPORTER}>Transportador</option>
-                    <option value={UserRole.STRATEGIC_PARTNER}>Parceiro Estratégico</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Província</label>
-                  <select required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.province} onChange={e => setNewUser({ ...newUser, province: e.target.value })}>
-                    <option value="">Selecionar...</option>
-                    {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Distrito</label>
-                  <select required className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#5B8C51] outline-none text-xs font-bold" value={newUser.district} onChange={e => setNewUser({ ...newUser, district: e.target.value })}>
-                    <option value="">Selecionar...</option>
-                    {(MOZ_GEOGRAPHY[newUser.province] || []).map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Telefone</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
                 </div>
               </div>
-              <div className="pt-6 flex gap-4">
-                <button type="submit" className="flex-grow bg-[#5B8C51] text-white py-4 rounded-2xl font-bold text-xs shadow-xl">Confirmar Registo</button>
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-8 bg-gray-100 text-gray-400 py-4 rounded-2xl font-bold text-xs">Cancelar</button>
+              <div className="pt-4 flex gap-3">
+                <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Registar Utilizador</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .detail-field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .detail-label { font-size: 8px; font-weight: 900; color: #B0BEC5; text-transform: none; letter-spacing: 0.2em; }
-        .detail-value { font-size: 1.1rem; font-weight: 800; color: #1E293B; }
-      `}</style>
+      {/* ARROW ICON FIX */}
+      <svg className="hidden">
+        <defs>
+          <symbol id="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </symbol>
+        </defs>
+      </svg>
+      {/* ADD ARROW ICON COMPONENT SINCE LUCIDE IMPORT WASN'T MODIFIED YET */}
     </div>
   );
 };
+
+// Polyfill arrow component if missed
+const ArrowRight = ({ size = 20, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+    <polyline points="12 5 19 12 12 19"></polyline>
+  </svg>
+);
 
 export default AdminDashboard;

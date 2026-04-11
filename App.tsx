@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { User, Product, CartItem, UserRole, PaymentAccount } from './types';
 import { CATEGORIES, MOCK_PRODUCTS, MOCK_USERS, WORLD_LANGUAGES } from './constants';
@@ -16,9 +16,42 @@ import { LanguageProvider, useLanguage } from './LanguageContext';
 import AIAgent from './components/AIAgent';
 import { mockDb } from './lib/mock_db';
 
+const mapUserFromSession = (sessionUser: any): User | null => {
+  if (!sessionUser) return null;
+  const metadata = sessionUser.user_metadata || {};
+  const isAdmin = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(sessionUser.email?.toLowerCase()) || metadata.role === UserRole.ADMIN;
+
+  return {
+    id: sessionUser.id,
+    email: sessionUser.email || '',
+    fullName: metadata.full_name || 'Utilizador',
+    phone: metadata.phone || '',
+    commercialPhone: metadata.commercial_phone || metadata.phone || '',
+    country: metadata.country || 'Moçambique',
+    province: metadata.province,
+    district: metadata.district,
+    posto: metadata.posto_administrativo,
+    localidade: metadata.localidade_bairro,
+    entityType: metadata.entity_type,
+    entityName: metadata.entity_name,
+    role: isAdmin ? UserRole.ADMIN : (metadata.role as UserRole || UserRole.BUYER),
+    isApproved: true,
+    balance: metadata.balance || 0,
+    status: (metadata.status as 'active' | 'inactive' | 'blocked') || 'active',
+    linkedAccounts: metadata.linked_accounts || []
+  };
+};
+
 const AppContent: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [user, setUser] = useState<User | null>(null);
+  const location = useLocation();
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const mockUser = localStorage.getItem('mock_user');
+      if (mockUser) return mapUserFromSession(JSON.parse(mockUser));
+    } catch { /* ignore */ }
+    return null;
+  });
   const [products, setProducts] = useState<Product[]>(() => {
     const existing = mockDb.getProducts();
     // Merge MOCK_PRODUCTS: add any product that isn't already in the list by ID
@@ -31,7 +64,7 @@ const AppContent: React.FC = () => {
     return merged;
   });
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [partners, setPartners] = useState<User[]>(() => {
     const allUsers = mockDb.getUsers();
     const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
@@ -48,32 +81,7 @@ const AppContent: React.FC = () => {
   });
   const [error, setError] = useState<string | null>(null);
 
-  const mapUserFromSession = (sessionUser: any): User | null => {
-    if (!sessionUser) return null;
-    const metadata = sessionUser.user_metadata || {};
-    // Verificação de Administrador via Email Principal ou Metadata
-    const isAdmin = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(sessionUser.email?.toLowerCase()) || metadata.role === UserRole.ADMIN;
 
-    return {
-      id: sessionUser.id,
-      email: sessionUser.email || '',
-      fullName: metadata.full_name || 'Utilizador',
-      phone: metadata.phone || '',
-      commercialPhone: metadata.commercial_phone || metadata.phone || '',
-      country: metadata.country || 'Moçambique',
-      province: metadata.province,
-      district: metadata.district,
-      posto: metadata.posto_administrativo,
-      localidade: metadata.localidade_bairro,
-      entityType: metadata.entity_type,
-      entityName: metadata.entity_name,
-      role: isAdmin ? UserRole.ADMIN : (metadata.role as UserRole || UserRole.BUYER),
-      isApproved: true,
-      balance: metadata.balance || 0,
-      status: (metadata.status as 'active' | 'inactive' | 'blocked') || 'active',
-      linkedAccounts: metadata.linked_accounts || []
-    };
-  };
 
   useEffect(() => {
     const handleDbChange = () => {
@@ -214,7 +222,6 @@ const AppContent: React.FC = () => {
     if (user) setUser({ ...user, linkedAccounts: accounts });
   };
 
-  // REDIRECIONAMENTO INTELIGENTE: ACESSO IMEDIATO CONFORME O PAPEL (ROLE)
   const RoleBasedHome = () => {
     if (!user) return <Home addToCart={addToCart} products={products} partners={partners} />;
 
@@ -231,18 +238,11 @@ const AppContent: React.FC = () => {
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1B5E20]">
-      <div className="flex flex-col items-center gap-6">
-        <Logo className="w-20 h-20 animate-pulse" color="white" />
-        <p className="text-white font-black text-[10px] uppercase tracking-[0.4em]">{t('app_loading' as any)}</p>
-      </div>
-    </div>
-  );
+  const isAdminView = user && [UserRole.ADMIN, UserRole.STRATEGIC_PARTNER].includes(user.role) && location.pathname === '/';
 
   return (
-    <HashRouter>
-      <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
+    <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
+      {!isAdminView && (
         <nav className="bg-white text-[#263238] sticky top-0 z-[100] border-b border-[#E0E0E0]">
           <div className="mx-auto px-[20px] md:px-[80px] h-[72px] flex justify-between items-center w-full">
             <Link to="/" className="flex items-center gap-2 group">
@@ -299,8 +299,9 @@ const AppContent: React.FC = () => {
             </div>
           </div>
         </nav>
+      )}
 
-        <main className="flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10">
+      <main className={isAdminView ? "flex-grow bg-[#F5F5F0]" : "flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10"}>
 
           <Routes>
             <Route path="/" element={<RoleBasedHome />} />
@@ -311,7 +312,8 @@ const AppContent: React.FC = () => {
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 
-          <footer className="mt-20 pt-[60px] pb-6 px-[20px] md:px-[80px] bg-[#F1F8F4] border-t border-[#E0E0E0]">
+          {!isAdminView && (
+            <footer className="mt-20 pt-[60px] pb-6 px-[20px] md:px-[80px] bg-[#F1F8F4] border-t border-[#E0E0E0]">
             <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-[40px] mb-12">
               <div className="col-span-1">
                 <div className="flex items-center gap-2 mb-4">
@@ -362,9 +364,10 @@ const AppContent: React.FC = () => {
               <p>© 2025 AgroSuste. Todos os direitos reservados</p>
             </div>
           </footer>
-        </main>
-        <AIAgent />
-      </div>
+        )}
+      </main>
+      <AIAgent />
+
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
@@ -379,15 +382,17 @@ const AppContent: React.FC = () => {
           animation-play-state: paused;
         }
       `}</style>
-    </HashRouter>
+    </div>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <HashRouter>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </HashRouter>
   );
 };
 
