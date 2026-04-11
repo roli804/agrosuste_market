@@ -71,31 +71,28 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
   return (
     <div className="space-y-16 pb-20">
       {/* Hero Section */}
-      <section className="relative h-[400px] md:h-[550px] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-sm group mx-2 md:mx-0 border border-[#E0E0E0]">
+      <section className="relative h-[400px] md:h-[550px] rounded-[2rem] overflow-hidden shadow-sm mx-2 md:mx-0 border border-[#E0E0E0]">
         <img
-          src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1600"
-          alt="Agricultura em Moçambique"
+          src="https://images.unsplash.com/photo-1628102491629-778571d893a3?auto=format&fit=crop&q=80&w=1600"
+          alt="Conectividade Global e Agricultura"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/80 to-white/40 flex flex-col items-center justify-center text-center p-10 text-[#263238]">
-          <div className="bg-[#4CAF50]/10 text-[#2E7D32] px-5 py-2 rounded-full text-xs font-semibold mb-6 border border-[#4CAF50]/20">
-            {t('hero_badge')}
-          </div>
-          <div className="flex items-center gap-4 md:gap-6 mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-1000">
-            <Logo className="w-12 h-12 md:w-16 md:h-16" color="#2E7D32" />
-            <h1 className="font-poppins text-3xl md:text-6xl font-bold text-[#263238] mb-4 tracking-tight">
-              {t('hero_title').split(' ')[0]} <span className="text-[#2E7D32]">{t('hero_title').split(' ')[1]}</span>
+        <div className="absolute inset-0 bg-white/85 flex flex-col items-center justify-center text-center p-10 backdrop-blur-md">
+          <div className="flex items-center gap-4 mb-6">
+            <Logo className="w-12 h-12 text-[#2E7D32] hidden md:block" color="#2E7D32" />
+            <h1 className="font-poppins text-4xl md:text-6xl font-bold text-[#263238] tracking-tight max-w-4xl leading-tight">
+              Conectando o Campo Aos <br className="hidden md:block" /> <span className="text-[#2E7D32]">Mercados Globais</span>
             </h1>
           </div>
-          <p className="text-sm md:text-xl max-w-2xl mb-8 md:mb-12 font-regular text-[#757575] leading-relaxed">
-            {t('hero_subtitle')}
+          <p className="font-inter text-[15px] md:text-[18px] max-w-2xl mb-10 text-[#263238] font-medium leading-relaxed">
+            A ponte direta entre produtores sustentáveis locais e investidores internacionais buscando qualidade premium e impacto verde real.
           </p>
-          <div className="flex flex-col sm:flex-row gap-5">
-            <Link to="/shop" className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-10 py-4 rounded-xl font-semibold transition-all shadow-md text-sm">
-              {t('hero_cta_shop')}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link to="/shop" className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-[24px] py-[12px] rounded-[8px] font-inter font-medium transition-all shadow-sm text-[15px]">
+              Explorar Produtos
             </Link>
-            <Link to="/auth?role=seller" className="bg-transparent hover:bg-white text-[#2E7D32] border-2 border-[#2E7D32] px-10 py-4 rounded-xl font-semibold transition-all text-sm">
-              {t('hero_cta_auth')}
+            <Link to="/auth?role=seller" className="bg-white hover:bg-gray-50 text-[#2E7D32] border border-[#E0E0E0] px-[24px] py-[12px] rounded-[8px] font-inter font-medium transition-all text-[15px] shadow-sm">
+              Conectar ao Mercado
             </Link>
           </div>
         </div>
@@ -136,25 +133,31 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
           {products.slice(0, 4).map(product => {
             const trans = translatedProducts[product.id] || { name: product.name, desc: product.description };
             return (
-              <div key={product.id} className="product-card group">
-                <div className="product-image-wrapper">
-                  <img src={product.images[0]} alt={trans.name} className="product-image" />
+              <div key={product.id} className="bg-[#FFFFFF] rounded-[12px] border border-[#E0E0E0] shadow-[-6px_0_18px_rgba(0,0,0,0.06)] hover:-translate-y-1 transition-transform duration-300 ease-in-out flex flex-col overflow-hidden">
+                <div className="relative">
+                  <img src={product.images[0]} alt={trans.name} className="w-full h-[180px] object-cover" />
                   {product.isDried && (
                     <span className="absolute top-4 left-4 bg-[#795548] text-white text-[10px] px-3 py-1.5 rounded-full font-bold shadow-md z-10">{t('home_dry_grain')}</span>
                   )}
-                  <div className="product-producer">{t('profile_official')}</div>
-                  <p className="text-[10px] md:text-xs text-gray-400 font-medium line-clamp-2 mb-4 leading-relaxed">{trans.desc}</p>
+                </div>
+                
+                <div className="p-5 flex flex-col flex-grow">
+                  <h3 className="font-poppins font-semibold text-[#263238] text-[16px] mb-2 leading-tight">{trans.name}</h3>
+                  <p className="font-inter text-[#757575] text-[13px] line-clamp-2 mb-6 flex-grow">{trans.desc}</p>
                   
-                  <div className="product-price-container">
-                    <span className="product-price">
-                        {product.price.toLocaleString()}
-                        <small>MZN /{product.unit}</small>
+                  <div className="flex justify-between items-center mb-5">
+                    <span className="font-bold text-[#2E7D32] text-[18px]">
+                        {product.price.toLocaleString()} <span className="text-[12px] font-medium text-[#757575]">MZN</span>
                     </span>
-                    <span className="product-unit font-bold text-[#2E5C4E]">{product.stock} {t('stock_available')}</span>
+                    {product.stock > 0 ? (
+                      <span className="font-inter text-[#4CAF50] text-[12px] font-medium">Em stock</span>
+                    ) : (
+                      <span className="font-inter text-[#E53935] text-[12px] font-medium">Indisponível</span>
+                    )}
                   </div>
                   
-                  <button onClick={() => addToCart(product)} className="product-action flex justify-center items-center gap-2 mt-2">
-                    🛒 {t('add_to_cart')}
+                  <button onClick={() => addToCart(product)} className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-[10px] rounded-[8px] font-inter font-medium text-[14px] transition-colors flex justify-center items-center">
+                    Ver Produto
                   </button>
                 </div>
               </div>
@@ -164,77 +167,40 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
       </section>
 
       {/* Nossos Parceiros - Estilo Ultra-Profissional e Elegante */}
-      <section className="bg-white rounded-[3.5rem] py-12 px-6 border border-gray-50 shadow-sm">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
-            <div className="text-center md:text-left">
-              <h2 className="text-2xl font-semibold text-gray-900   leading-none">{t('partners_title')}</h2>
-              <p className="text-[#5B8C51] text-[8px] font-semibold   mt-3">{t('partners_subtitle')}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-[1px] w-12 bg-green-100 hidden md:block"></div>
-              <span className="text-[8px] font-semibold text-gray-300">{t('partners_network')}</span>
-            </div>
+      <section className="bg-white rounded-[3.5rem] py-12 px-6 border border-gray-50 shadow-sm overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 mb-10">
+          <div className="text-center md:text-left">
+            <h2 className="text-2xl font-semibold text-gray-900 leading-none">{t('partners_title')}</h2>
+            <p className="text-[#5B8C51] text-[10px] uppercase tracking-widest font-bold mt-3">{t('partners_subtitle')}</p>
           </div>
-          <div className="partners-grid">
-              
-              {/* 1. Rede Global Agro-Suste (ONG) */}
-              <div className="partner-card ngo">
-                  <div className="partner-icon">🌍</div>
-                  <h4 className="partner-name">Rede Global Agro-Suste</h4>
-                  <span className="partner-tag">ONG Internacional</span>
-              </div>
+        </div>
 
-              {/* 2. Ajuda Mútua (ONG) */}
-              <div className="partner-card ngo">
-                  <div className="partner-icon">🤝</div>
-                  <h4 className="partner-name">Ajuda Mútua</h4>
-                  <span className="partner-tag">Desenvolvimento Social</span>
-              </div>
-
-              {/* 3. Banco de Fomento (Finanças) */}
-              <div className="partner-card finance">
-                  <div className="partner-icon">🏦</div>
-                  <h4 className="partner-name">Banco de Fomento</h4>
-                  <span className="partner-tag">Crédito Agrícola</span>
-              </div>
-
-              {/* 4. Logística Nacional (Logística) */}
-              <div className="partner-card logistics">
-                  <div className="partner-icon">🚛</div>
-                  <h4 className="partner-name">Logística Nacional</h4>
-                  <span className="partner-tag">Escoamento Seguro</span>
-              </div>
-
-              {/* 5. Agro Invest (Finanças) */}
-              <div className="partner-card finance">
-                  <div className="partner-icon">📈</div>
-                  <h4 className="partner-name">Agro Invest</h4>
-                  <span className="partner-tag">Capital de Risco</span>
-              </div>
-
-              {/* 6. Certifica Moz (Certificação) */}
-              <div className="partner-card">
-                  <div className="partner-icon">✅</div>
-                  <h4 className="partner-name">Certifica Moz</h4>
-                  <span className="partner-tag">Selo Orgânico</span>
-              </div>
-
-              {/* 7. Inovação Verde (Tecnologia) */}
-              <div className="partner-card">
-                  <div className="partner-icon">💧</div>
-                  <h4 className="partner-name">Inovação Verde</h4>
-                  <span className="partner-tag">Irrigação Tech</span>
-              </div>
-
-              {/* 8. Aliança Climática (Sustentabilidade) */}
-              <div className="partner-card ngo">
-                  <div className="partner-icon">🌱</div>
-                  <h4 className="partner-name">Aliança Climática</h4>
-                  <span className="partner-tag">Carbono Neutro</span>
-              </div>
-
-          </div>
+        <div className="relative w-full overflow-hidden">
+          {partners.length > 0 ? (
+            <div className="animate-marquee flex gap-10 py-10">
+              {/* Duplicamos a lista para o loop infinito ser invisível */}
+              {[...partners, ...partners, ...partners].map((partner, index) => (
+                <div 
+                  key={`${partner.id}-${index}`}
+                  className="flex-shrink-0 w-[240px] bg-white p-6 rounded-2xl shadow-left-premium border border-gray-50 flex flex-col items-center text-center transition-transform hover:scale-105 select-none"
+                >
+                  <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center text-3xl mb-4 overflow-hidden border border-gray-100">
+                    {partner.logo ? (
+                      <img src={partner.logo} alt={partner.entityName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span>🤝</span>
+                    )}
+                  </div>
+                  <h4 className="font-poppins font-bold text-[#263238] text-[15px] mb-1 line-clamp-1">{partner.entityName || partner.fullName}</h4>
+                  <span className="text-[10px] text-[#5B8C51] font-bold uppercase tracking-widest truncate w-full">{partner.entityType || 'Estratégico'}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-40 flex items-center justify-center text-gray-400 font-medium italic">
+              Conectando novos parceiros à rede global...
+            </div>
+          )}
         </div>
       </section>
 

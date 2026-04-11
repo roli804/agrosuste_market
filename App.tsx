@@ -35,7 +35,7 @@ const AppContent: React.FC = () => {
   const [partners, setPartners] = useState<User[]>(() => {
     const allUsers = mockDb.getUsers();
     const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
-    
+
     // Fallback para os estáticos APENAS se não houver manuais, ou merge?
     // User pediu para deixar 2 ou 3 apenas.
     const merged = [...localPartners];
@@ -141,7 +141,7 @@ const AppContent: React.FC = () => {
           // Fallback para mock local centralizado (mockDb)
           const allUsers = mockDb.getUsers();
           const partnersFromDb = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
-          
+
           const merged = [...partnersFromDb];
           MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
             if (!merged.find(p => p.email === mp.email)) {
@@ -169,8 +169,18 @@ const AppContent: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(mapUserFromSession(session?.user));
     });
+
+    // --- REAL-TIME SYNC PARA PARCEIROS ---
+    const partnersChannel = supabase
+      .channel('public:profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.${UserRole.STRATEGIC_PARTNER}` }, () => {
+        fetchSession(); // Re-fetch completo para garantir consistência
+      })
+      .subscribe();
+
     return () => {
       subscription.unsubscribe();
+      partnersChannel.unsubscribe();
       window.removeEventListener('mock-db-changed', handleDbChange);
     };
   }, []);
@@ -178,10 +188,10 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     // Sincronizar produtos com o MockDb para persistência central
     products.forEach(p => {
-        const existing = mockDb.getProducts();
-        if (!existing.find(ep => ep.id === p.id)) {
-            mockDb.saveProduct(p);
-        }
+      const existing = mockDb.getProducts();
+      if (!existing.find(ep => ep.id === p.id)) {
+        mockDb.saveProduct(p);
+      }
     });
   }, [products]);
 
@@ -234,77 +244,62 @@ const AppContent: React.FC = () => {
     <HashRouter>
       <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
         <nav className="bg-white text-[#263238] sticky top-0 z-[100] border-b border-[#E0E0E0]">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 h-[70px] flex justify-between items-center">
-            <Link to="/" className="flex items-center gap-2 md:gap-4 group">
-              <Logo className="w-8 h-8 md:w-10 md:h-10 group-hover:rotate-[15deg] transition-transform duration-500" color="#2E7D32" />
-              <div className="flex flex-col">
-                <span className="font-poppins font-bold text-lg md:text-xl tracking-tight leading-none text-[#263238]">Agro-Suste</span>
-                <span className="text-[7px] md:text-[9px] font-medium opacity-60 uppercase tracking-widest">{t('app_tagline' as any)}</span>
-              </div>
+          <div className="mx-auto px-[20px] md:px-[80px] h-[72px] flex justify-between items-center w-full">
+            <Link to="/" className="flex items-center gap-2 group">
+              <Logo className="w-8 h-8 group-hover:rotate-[15deg] transition-transform duration-500" color="#2E7D32" />
+              <span className="font-poppins font-bold text-lg tracking-tight leading-none text-[#263238]">AgroSuste</span>
             </Link>
 
-            <div className="flex items-center gap-4 lg:gap-8">
-              <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
-                {[
-                  { code: 'pt', label: 'PT' },
-                  { code: 'en', label: 'IN' }
-                ].map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => setLanguage(l.code)}
-                    className={`px-3 py-1 rounded-lg text-[9px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold' : 'text-gray-400 hover:text-[#2E7D32]'}`}
-                  >
+            <div className="hidden lg:flex items-center gap-6">
+              <Link to="/" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Início</Link>
+              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Soluções</Link>
+              <Link to="/mercados" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Mercados</Link>
+              <Link to="/sobre" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Sobre Nós</Link>
+              <Link to="/relatorios-publicos" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Recursos</Link>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100 mr-2">
+                {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
+                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold' : 'text-gray-400 hover:text-[#2E7D32]'}`}>
                     {l.label}
                   </button>
                 ))}
               </div>
 
-              {user && (
-                <div className="hidden lg:flex items-center gap-6 mr-4">
-                  <Link to="/" className="text-[11px] font-medium uppercase tracking-wider text-[#263238] hover:text-[#2E7D32] transition-all">{t('nav_home' as any)}</Link>
-                  <Link to="/shop" className="text-[11px] font-medium uppercase tracking-wider text-[#263238] hover:text-[#2E7D32] transition-all">{t('nav_shop' as any)}</Link>
-                  <Link to="/relatorios-publicos" className="text-[11px] font-medium uppercase tracking-wider text-[#4CAF50] hover:text-[#2E7D32] transition-all">{t('nav_transparency' as any)}</Link>
-                </div>
-              )}
-
-              <Link to="/checkout" className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl hover:bg-gray-100 text-[#263238] relative transition-all">
-                <span className="text-xl">🛒</span>
-                {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#2E7D32] text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
-                    {cart.length}
-                  </span>
-                )}
+              <Link to="/checkout" className="text-xl relative transition-all mr-2">
+                🛒
+                {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-[#2E7D32] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.length}</span>}
               </Link>
 
               {user ? (
                 <div className="flex items-center gap-3">
-                  <Link to="/profile" className="flex items-center gap-2 md:gap-4 bg-white pl-3 md:pl-5 pr-2 py-1.5 md:py-2 rounded-xl md:rounded-2xl border border-[#E0E0E0] hover:bg-gray-50 transition-all group">
-                    <div className="hidden sm:flex flex-col items-end mr-1">
-                      <span className="text-[11px] font-medium uppercase tracking-tight leading-none mb-1 text-[#263238] group-hover:text-[#2E7D32]">{user.fullName.split(' ')[0]}</span>
-                      <span className="text-[8px] font-medium uppercase tracking-wider text-[#757575]">{user.role}</span>
+                  <Link to="/profile" className="flex items-center gap-3 bg-transparent pl-3 pr-2 py-1.5 rounded-[8px] border border-[#E0E0E0] hover:bg-gray-50 transition-all group">
+                    <div className="hidden sm:flex flex-col items-end">
+                      <span className="text-[14px] font-inter leading-none text-[#263238] group-hover:text-[#2E7D32]">{user.fullName.split(' ')[0]}</span>
                     </div>
-                    <div className="w-8 h-8 md:w-9 md:h-9 bg-[#2E7D32] text-white rounded-lg md:rounded-xl flex items-center justify-center font-bold text-xs md:text-sm shadow-sm">
+                    <div className="w-8 h-8 bg-[#2E7D32] text-white rounded-[6px] flex items-center justify-center font-bold text-xs shadow-sm">
                       {user.fullName[0]}
                     </div>
                   </Link>
-                  <button onClick={handleLogout} className="bg-transparent hover:bg-red-50 text-red-500 border border-red-200 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-medium uppercase tracking-wider transition-all">
-                    {t('nav_logout' as any)}
+                  <button onClick={handleLogout} className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-[18px] py-[10px] rounded-[8px] text-[14px] font-semibold transition-all">
+                    Sair
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Link to="/auth" className="bg-transparent border border-[#E0E0E0] text-[#263238] hover:bg-gray-50 px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-[11px] font-medium uppercase tracking-wider transition-all">
+                <div className="flex items-center gap-3">
+                  <Link to="/auth" className="bg-transparent border border-[#E0E0E0] text-[#263238] hover:bg-gray-50 px-[16px] py-[8px] rounded-[8px] font-inter text-[14px] transition-all">
                     Login
                   </Link>
-                  <Link to="/auth?mode=register" className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-4 md:px-6 py-2 border border-transparent rounded-xl text-[10px] md:text-[11px] font-medium uppercase tracking-wider shadow-sm transition-all hidden sm:block">
-                    {t('nav_auth' as any)}
+                  <Link to="/auth?mode=register" className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-[18px] py-[10px] border border-transparent rounded-[8px] font-inter font-semibold text-[14px] transition-all hidden sm:block">
+                    Fale com um Consultor
                   </Link>
                 </div>
               )}
             </div>
           </div>
         </nav>
-        
+
         <main className="flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10">
 
           <Routes>
@@ -316,48 +311,55 @@ const AppContent: React.FC = () => {
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 
-          <footer className="mt-20 border-t border-[#E0E0E0] pt-16 pb-8 bg-[#F1F8F4]">
-            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-              <div className="col-span-1 md:col-span-1">
-                <Logo className="w-10 h-10 mb-4" color="#2E7D32" />
-                <h3 className="font-poppins font-bold text-[#263238] text-lg mb-2">AgroConnect</h3>
-                <p className="text-[13px] text-[#757575] leading-relaxed">
-                  Conectando produtores rurais a mercados internacionais, promovendo sustentabilidade e transparência.
+          <footer className="mt-20 pt-[60px] pb-6 px-[20px] md:px-[80px] bg-[#F1F8F4] border-t border-[#E0E0E0]">
+            <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-[40px] mb-12">
+              <div className="col-span-1">
+                <div className="flex items-center gap-2 mb-4">
+                  <Logo className="w-8 h-8" color="#2E7D32" />
+                  <span className="font-poppins font-bold text-lg text-[#263238]">AgroSuste</span>
+                </div>
+                <p className="text-[14px] text-[#757575] leading-relaxed mb-6 font-inter">
+                  Conectando o campo ao mundo com sustentabilidade
                 </p>
-              </div>
-              <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">A Plataforma</h4>
-                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
-                  <Link to="/" className="hover:text-[#2E7D32] transition-colors">Sobre Nós</Link>
-                  <Link to="/relatorios-publicos" className="hover:text-[#2E7D32] transition-colors">{t('nav_transparency' as any) || 'Transparência'}</Link>
-                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Sustentabilidade</a>
-                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Parceiros</a>
+                <div className="flex gap-4 mb-4">
+                  {/* Social Icons Placeholders */}
+                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">in</div>
+                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">X</div>
+                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">f</div>
                 </div>
               </div>
+
               <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">Soluções</h4>
-                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
-                  <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">Comprar Produtos</Link>
-                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Vender (Produtores)</a>
-                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Logística</a>
-                  <a href="#" className="hover:text-[#2E7D32] transition-colors">Investimento Verde</a>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Soluções</h4>
+                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
+                  <Link to="/shop" className="hover:text-[#2E7D32] transition-colors w-fit">Marketplace</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Financiamento</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">ESG</Link>
                 </div>
               </div>
+
               <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">Contato</h4>
-                <div className="flex flex-col gap-3 text-[13px] text-[#757575]">
-                  <p>geral@agroconnect.com</p>
-                  <p>+258 84 000 0000</p>
-                  <p className="mt-2">Maputo, Moçambique</p>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Mercados</h4>
+                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Europa</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Ásia</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">África</Link>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Empresa</h4>
+                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Sobre nós</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Blog</Link>
+                  <Link to="/relatorios-publicos" className="hover:text-[#2E7D32] transition-colors w-fit">Impacto</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Suporte e Conta</Link>
                 </div>
               </div>
             </div>
-            <div className="max-w-7xl mx-auto px-6 border-t border-[#E0E0E0] pt-8 flex flex-col md:flex-row justify-between items-center text-[12px] text-[#757575]">
-              <p>© {new Date().getFullYear()} AgroConnect. Todos os direitos reservados.</p>
-              <div className="flex gap-4 mt-4 md:mt-0">
-                <a href="#" className="hover:text-[#2E7D32]">Termos de Uso</a>
-                <a href="#" className="hover:text-[#2E7D32]">Privacidade</a>
-              </div>
+
+            <div className="max-w-[1400px] mx-auto border-t border-[#E0E0E0] pt-6 flex flex-col items-center justify-center text-[13px] font-inter text-[#9E9E9E]">
+              <p>© 2025 AgroSuste. Todos os direitos reservados</p>
             </div>
           </footer>
         </main>

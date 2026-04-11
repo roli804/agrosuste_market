@@ -5,11 +5,10 @@ import { UserRole, EntityType } from '../types';
 import Logo from '../components/Logo';
 import { MOZ_GEOGRAPHY, WORLD_COUNTRIES, CATEGORIES } from '../constants';
 import { getCountryPhoneInfo, CountryPhoneInfo, verifyEmailCredibility } from '../lib/geography_api';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Upload, ArrowRight, ArrowLeft } from 'lucide-react';
 
 import { useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { Upload } from 'lucide-react';
 import { mockDb } from '../lib/mock_db';
 import { LogType } from '../types';
 
@@ -47,8 +46,66 @@ const Auth: React.FC = () => {
   }, [location.search]);
   const [phone, setPhone] = useState('');
   const [commPhone, setCommPhone] = useState(''); // Contacto Comercial Principal
+  const [phoneWarning, setPhoneWarning] = useState<{ personal: string | null, comm: string | null }>({ personal: null, comm: null });
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [step, setStep] = useState(1);
+
+  const validateStep = (currentStep: number) => {
+    if (currentStep === 1) {
+      if (!fullName || !email || !password) {
+        setError("Por favor, preencha todos os campos obrigatórios.");
+        return false;
+      }
+    } else if (currentStep === 2) {
+      if (!country || !entityType || !role) {
+        setError("Por favor, selecione as opções de perfil.");
+        return false;
+      }
+      if (country === 'Moçambique' && (!posto || !localidade || !province || !district)) {
+        setError("Para Moçambique: Província, Distrito, Posto e Localidade são obrigatórios.");
+        return false;
+      }
+      if (country !== 'Moçambique' && !partnerLocation) {
+        setError("Localização internacional é obrigatória.");
+        return false;
+      }
+    }
+    setError(null);
+    return true;
+  };
+
+  const nextStep = () => {
+    if (validateStep(step)) setStep(prev => prev + 1);
+  };
+
+  const prevStep = () => {
+    setError(null);
+    setStep(prev => prev - 1);
+  };
+
+  const handlePhoneInput = (rawVal: string, setter: React.Dispatch<React.SetStateAction<string>>, field: 'personal' | 'comm') => {
+    let val = rawVal.replace(/\D/g, '');
+    let warning = null;
+
+    if (val.length > 0 && phoneMeta.validPrefixes && phoneMeta.validPrefixes.length > 0) {
+      const isStartValid = phoneMeta.validPrefixes.some(prefix => 
+        val.startsWith(prefix) || prefix.startsWith(val)
+      );
+      if (!isStartValid) {
+        warning = `Operadora inválida (${country}). Iniciais válidas: ${phoneMeta.validPrefixes.join(', ')}.`;
+        val = val.substring(0, val.length - 1);
+      }
+    }
+
+    if (val.length > phoneMeta.maxLength) {
+      warning = `O número atingiu o limite de ${phoneMeta.maxLength} dígitos para ${country}.`;
+      val = val.substring(0, phoneMeta.maxLength);
+    }
+
+    setPhoneWarning(prev => ({ ...prev, [field]: warning }));
+    setter(val);
+  };
 
   // Documentos para Empresa/Cooperativa
   const [nuit, setNuit] = useState('');
@@ -68,12 +125,33 @@ const Auth: React.FC = () => {
     validPrefixes: ['82', '83', '84', '85', '86', '87']
   });
 
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setPhone('');
+    setCommPhone('');
+    setEntityName('');
+    setProvince('');
+    setDistrict('');
+    setPosto('');
+    setLocalidade('');
+    setPartnerLogo('');
+    setPartnerLocation('');
+    setSelectedCategories([]);
+    setError(null);
+  };
+
   useEffect(() => {
     if (mode === 'signup') getCountryPhoneInfo(country).then(setPhoneMeta);
   }, [country, mode]);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAuth = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    // GUARD: Impede disparos acidentais antes do último passo
+    if (mode === 'signup' && step < 3) return;
+
     setLoading(true);
     setError(null);
 
@@ -81,6 +159,24 @@ const Auth: React.FC = () => {
       if (mode === 'login') {
         const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
+        
+        // --- SINCRONIZAÇÃO PROATIVA ---
+        // Se o login no Supabase funcionar, guardamos no Mock para o caso de a rede cair na próxima vez
+        if (data.user) {
+          const metadata = data.user.user_metadata || {};
+          mockDb.saveUser({
+            id: data.user.id,
+            email: data.user.email || '',
+            fullName: metadata.full_name || 'Utilizador',
+            phone: metadata.phone || '',
+            commercialPhone: metadata.commercial_phone || '',
+            country: metadata.country || 'Moçambique',
+            role: metadata.role || UserRole.BUYER,
+            status: 'active',
+            isApproved: true,
+            linkedAccounts: []
+          });
+        }
         
         // Se o login no Supabase funcionar, ele segue o fluxo normal.
         // Se falhar (ex: rede), cai no catch abaixo que agora é mais rigoroso.
@@ -133,6 +229,27 @@ const Auth: React.FC = () => {
           }
         });
         if (err) throw err;
+
+        // Se o resgisto no Supabase funcionar, também guardamos no Mock para redundância
+        mockDb.saveUser({
+          id: `sb-${Date.now()}`, // ID temporário até o próximo login carregar o real
+          email,
+          fullName,
+          phone: `${phoneMeta.prefix}${phone}`,
+          commercialPhone: `${phoneMeta.prefix}${commPhone}`,
+          country,
+          role: finalRole,
+          entityType,
+          entityName: entityType === EntityType.INDIVIDUAL ? fullName : entityName,
+          posto,
+          localidade,
+          status: 'active',
+          isApproved: isAdminEmail,
+          linkedAccounts: [],
+          balance: 0
+        });
+
+        resetForm();
         setShowSuccessMessage(true);
       }
     } catch (err: any) {
@@ -241,236 +358,407 @@ const Auth: React.FC = () => {
           <h2 className="text-5xl font-semibold text-gray-900  ">{t('auth_success_title')}</h2>
           <p className="text-gray-500 font-bold text-[10px]">{t('auth_success_desc')}</p>
         </div>
-        <button onClick={() => setShowSuccessMessage(false)} className="w-full bg-[#2E5C4E] text-white py-8 rounded-[2rem] font-semibold text-xs   shadow-2xl">{t('auth_success_btn')}</button>
+        <button 
+          onClick={() => { 
+            setShowSuccessMessage(false); 
+            setMode('login'); 
+            resetForm(); 
+          }} 
+          className="w-full bg-[#2E5C4E] text-white py-8 rounded-[2rem] font-semibold text-xs shadow-2xl transition-transform active:scale-95"
+        >
+          {t('auth_success_btn')}
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto my-6 px-4 pb-24">
-      <div className="bg-white rounded-[4rem] shadow-strong overflow-hidden border border-gray-100">
-        <div className="bg-[#2E5C4E] p-12 text-white text-center flex flex-col items-center relative">
+    <div className="w-full flex justify-center py-12 px-4 bg-[#F5F5F0] min-h-[80vh] transition-all duration-500">
+      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-[16px] border border-transparent shadow-[0_10px_30px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 hover:shadow-[0_15px_35px_rgba(0,0,0,0.08)] hover:-translate-y-1">
+        
+        {/* CABEÇALHO */}
+        <div className="pt-10 pb-6 px-10 text-center relative border-b border-gray-50 bg-[#FFFFFF]">
+          <Logo className="w-12 h-12 mx-auto mb-4 transition-transform duration-300 hover:scale-105" color="#2E7D32" />
+          <h2 className="text-[28px] md:text-[32px] text-[#1C1C1C] mb-2" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
+            {mode === 'login' ? 'Entrar na plataforma' : 'Crie sua conta'}
+          </h2>
+          <p className="text-[#6D6D6D] text-[14px] font-inter">
+            {mode === 'login' ? 'Bem-vindo de volta ao AgroConnect' : 'Preencha os dados abaixo para se juntar à nossa rede global'}
+          </p>
+
           <button
             type="button"
-            onClick={() => setMode('login')}
-            className="absolute top-8 right-8 bg-white/10 hover:bg-white/20 px-6 py-2 rounded-xl text-[9px] font-semibold   transition-all"
+            onClick={() => { 
+              const nextMode = mode === 'login' ? 'signup' : 'login';
+              setMode(nextMode); 
+              resetForm();
+              setStep(1); 
+            }}
+            className="absolute top-6 right-6 text-[#2E7D32] hover:text-[#1B5E20] text-[13px] font-medium font-inter transition-all duration-300 px-3 py-1.5 rounded-lg hover:bg-green-50"
           >
-            {t('nav_auth')}
+            {mode === 'login' ? 'Criar Conta' : 'Fazer Login'}
           </button>
-          <Logo className="w-20 h-20 mb-4" color="white" />
-          <h2 className="text-4xl font-semibold  ">{mode === 'login' ? t('auth_login_title') : t('auth_signup_title')}</h2>
-          <p className="text-[10px] font-semibold opacity-40 mt-4">{t('auth_tagline')}</p>
         </div>
 
-        <form onSubmit={handleAuth} className="p-12 space-y-10">
-          {error && <div className="bg-red-50 text-red-600 text-[10px] font-semibold p-6 rounded-3xl border border-red-100   animate-bounce">⚠️ {error}</div>}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            {mode === 'signup' && (
-              <>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="auth-label">{t('auth_full_name')}</label>
-                  <input required className="auth-input" placeholder="Ex: Jaime Cebola" value={fullName} onChange={e => setFullName(e.target.value)} />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="auth-label">{t('auth_country')}</label>
-                  <select required className="auth-input" value={country} onChange={e => setCountry(e.target.value)}>
-                    {WORLD_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="auth-label">{t('auth_entity_type')}</label>
-                  <select required className="auth-input" value={entityType} onChange={e => setEntityType(e.target.value as EntityType)}>
-                    <option value={EntityType.INDIVIDUAL}>👤 {t('auth_individual')}</option>
-                    <option value={EntityType.ASSOCIATION}>🤝 {t('auth_association')}</option>
-                    <option value={EntityType.COOPERATIVE}>🏢 {t('auth_cooperative')}</option>
-                    <option value={EntityType.COMPANY}>🏗️ {t('auth_company')}</option>
-                    <option value={EntityType.NGO_INTL}>🌍 {t('auth_ngo')}</option>
-                    <option value={EntityType.OTHER}>❓ {t('auth_other')}</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="auth-label">{t('auth_role')}</label>
-                  <select required className="auth-input" value={role} onChange={e => setRole(e.target.value as UserRole)}>
-                    <option value={UserRole.SELLER}>🚜 {t('auth_seller')}</option>
-                    <option value={UserRole.BUYER}>🛒 {t('auth_buyer')}</option>
-                    <option value={UserRole.TRANSPORTER}>🚛 {t('auth_transporter')}</option>
-                    <option value={UserRole.EXTENSIONIST}>📋 {t('auth_extensionist')}</option>
-                    <option value={UserRole.STRATEGIC_PARTNER}>🤝 {t('auth_strategic_partner')}</option>
-                    <option value={UserRole.OTHER}>❓ {t('auth_other')}</option>
-                  </select>
-                </div>
-
-                {country === 'Moçambique' ? (
-                  <>
-                    <div className="space-y-2">
-                      <label className="auth-label">{t('auth_province')}</label>
-                      <select required className="auth-input" value={province} onChange={e => setProvince(e.target.value)}>
-                        <option value="">{t('auth_select_province')}</option>
-                        {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="auth-label">{t('auth_district')}</label>
-                      <select required className="auth-input" value={district} onChange={e => setDistrict(e.target.value)}>
-                        <option value="">{t('auth_select_district')}</option>
-                        {(MOZ_GEOGRAPHY[province] || []).map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="auth-label">{t('auth_posto')}</label>
-                      <input required className="auth-input" placeholder="Ex: Posto Sede" value={posto} onChange={e => setPosto(e.target.value)} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="auth-label">{t('auth_localidade')}</label>
-                      <input required className="auth-input" placeholder="Ex: Bairro 25 de Setembro" value={localidade} onChange={e => setLocalidade(e.target.value)} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="auth-label">{t('auth_intl_location')}</label>
-                    <input required className="auth-input" placeholder={t('auth_intl_location_placeholder')} value={partnerLocation} onChange={e => setPartnerLocation(e.target.value)} />
-                  </div>
-                )}
-
-                 {/* Documentação Empresarial */}
-                {(entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) && (
-                  <div className="md:col-span-2 bg-amber-50/50 p-8 rounded-[2.5rem] border border-amber-100 space-y-6">
-                    <h4 className="text-[10px] font-semibold text-amber-800">{t('auth_business_docs')}</h4>
-                    <p className="text-[9px] text-amber-600 font-medium leading-relaxed">{t('auth_business_docs_desc')}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input required className="auth-input text-xs" placeholder={t('auth_nuit')} value={nuit} onChange={e => setNuit(e.target.value)} />
-                      <input required className="auth-input text-xs" placeholder={t('auth_alvara')} value={alvara} onChange={e => setAlvara(e.target.value)} />
-                      <input required className="auth-input text-xs" placeholder={t('auth_estatuto')} value={estatuto} onChange={e => setEstatuto(e.target.value)} />
-                      <input required className="auth-input text-xs" placeholder={t('auth_boletim')} value={boletim} onChange={e => setBoletim(e.target.value)} />
-                    </div>
-                  </div>
-                )}
-
-                {(role === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) && (
-                  <div className="md:col-span-2 space-y-4">
-                    <label className="auth-label">{t('auth_logo_upload')}</label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-24 h-24 bg-gray-50 rounded-3xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-300 hover:border-[#5B8C51] hover:text-[#5B8C51] transition-all cursor-pointer relative overflow-hidden group">
-                        {partnerLogo ? (
-                          <img src={partnerLogo} className="w-full h-full object-cover" />
-                        ) : (
-                          <>
-                            <Upload size={24} />
-                            <span className="text-[8px] font-semibold  mt-2">Upload</span>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => setPartnerLogo(reader.result as string);
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="flex-grow">
-                        <input required className="auth-input" placeholder={t('auth_logo_url_placeholder')} value={partnerLogo} onChange={e => setPartnerLogo(e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {role === UserRole.SELLER && (
-                  <div className="md:col-span-2 space-y-4">
-                    <label className="auth-label">{t('auth_categories')}</label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {CATEGORIES.map(cat => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategories(prev =>
-                              prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
-                            );
-                          }}
-                          className={`p-4 rounded-2xl border-2 transition-all text-[10px] font-semibold  flex items-center gap-2 ${selectedCategories.includes(cat.id)
-                            ? 'border-[#5B8C51] bg-green-50 text-[#2E5C4E]'
-                            : 'border-gray-100 bg-white text-gray-400'
-                            }`}
-                        >
-                          <span>{cat.icon}</span>
-                          {cat.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label className="auth-label">{t('auth_phone_personal')}</label>
-                  <div className="flex gap-2">
-                    <span className="bg-gray-100 p-4 rounded-2xl font-semibold text-xs text-gray-400">{phoneMeta.prefix}</span>
-                    <input required className="auth-input" placeholder={phoneMeta.example} value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="auth-label">{t('auth_phone_comm')}</label>
-                  <div className="flex gap-2">
-                    <span className="bg-gray-100 p-4 rounded-2xl font-semibold text-xs text-gray-400">{phoneMeta.prefix}</span>
-                    <input required className="auth-input" placeholder={t('profile_ex_phone')} value={commPhone} onChange={e => setCommPhone(e.target.value.replace(/\D/g, ''))} />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="space-y-2">
-              <label className="auth-label">{t('auth_email')}</label>
-              <input type="email" required className="auth-input" placeholder={t('auth_email_placeholder')} value={email} onChange={e => setEmail(e.target.value)} />
-            </div>
-
-            <div className="space-y-2 relative">
-              <label className="auth-label">{t('auth_password')}</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  className="auth-input pr-14"
-                  placeholder={t('auth_pass_placeholder')}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5B8C51] transition-all"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+        {/* PROGRESS BAR (APENAS SIGNUP) */}
+        {mode === 'signup' && (
+          <div className="px-12 pt-8 pb-4">
+            <div className="relative flex items-center justify-between">
+              <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-gray-100 -z-10 -translate-y-1/2" />
+              <div 
+                className="absolute left-0 top-1/2 h-[2px] bg-[#2E7D32] transition-all duration-500 ease-out -z-10 -translate-y-1/2" 
+                style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }} 
+              />
+              
+              <div className="relative bg-white px-2 cursor-default group" onClick={() => step > 1 && setStep(1)}>
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-500 ${step >= 1 ? 'bg-[#1B5E20] text-white shadow-md scale-110' : 'bg-gray-100 text-[#6D6D6D] group-hover:bg-gray-200'}`}>
+                  {step > 1 ? '✓' : '1'}
+                </span>
+                <span className={`absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium transition-colors duration-300 ${step >= 1 ? 'text-[#1B5E20]' : 'text-gray-400'}`}>Básico</span>
+              </div>
+              <div className="relative bg-white px-2 cursor-default group" onClick={() => step > 2 && setStep(2)}>
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-500 ${step >= 2 ? 'bg-[#1B5E20] text-white shadow-md scale-110' : 'bg-gray-100 text-[#6D6D6D] group-hover:bg-gray-200'}`}>
+                  {step > 2 ? '✓' : '2'}
+                </span>
+                <span className={`absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium transition-colors duration-300 ${step >= 2 ? 'text-[#1B5E20]' : 'text-gray-400'}`}>Perfil</span>
+              </div>
+              <div className="relative bg-white px-2 cursor-default">
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-500 ${step >= 3 ? 'bg-[#1B5E20] text-white shadow-md scale-110' : 'bg-gray-100 text-[#6D6D6D]'}`}>
+                  3
+                </span>
+                <span className={`absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium transition-colors duration-300 ${step >= 3 ? 'text-[#1B5E20]' : 'text-gray-400'}`}>Final</span>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="pt-10 space-y-6">
-            <button type="submit" disabled={loading} className="w-full bg-[#5B8C51] hover:bg-[#2E5C4E] text-white font-semibold py-8 rounded-[2.5rem] shadow-strong transition-all text-xs">
-              {loading ? t('auth_processing') : mode === 'login' ? t('auth_login_btn') : t('auth_signup_btn')}
-            </button>
-            <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-semibold text-gray-400 hover:text-[#5B8C51]">
-              {mode === 'login' ? t('auth_no_account') : t('auth_has_account')}
-            </button>
-          </div>
+        <form 
+          onSubmit={(e) => e.preventDefault()} 
+          onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+          className="p-10 relative overflow-hidden hidden-scroll"
+        >
+          {error && <div className="bg-red-50 text-red-600 text-[13px] p-4 rounded-xl border border-red-100 mb-6 font-inter text-center animate-in fade-in slide-in-from-top-2 shadow-sm font-medium">{error}</div>}
+
+          {/* MODO LOGIN */}
+          {mode === 'login' ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="relative">
+                <input type="email" required className="auth-input peer" placeholder=" " value={email} onChange={e => setEmail(e.target.value)} />
+                <label className="auth-floating-label">Email</label>
+              </div>
+              <div className="relative pt-1">
+                <div className="flex justify-end w-full mb-1 absolute right-0 -top-4">
+                   <a href="#" className="text-[#2E7D32] text-[12px] hover:text-[#1B5E20] transition-colors font-medium hover:underline">Esqueceu a senha?</a>
+                </div>
+                <div className="relative">
+                  <input type={showPassword ? "text" : "password"} required className="auth-input peer pr-12" placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
+                  <label className="auth-floating-label">Senha</label>
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2E7D32] transition-transform active:scale-95">
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              <div className="pt-6">
+                <button type="button" onClick={handleAuth} disabled={loading} className="btn-primary w-full shadow-[0_4px_14px_rgba(27,94,32,0.25)] text-[15px] group py-3">
+                  {loading ? 'A processar...' : 'Entrar'}
+                  {!loading && <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-1 ml-2" />}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* MODO SIGNUP EM PASSOS */
+            <div className="space-y-6 relative">
+              {step === 1 && (
+                <div className="space-y-6 w-full animate-in fade-in slide-in-from-right-4 duration-500">
+                  <div className="relative">
+                    <input required className="auth-input peer" placeholder=" " value={fullName} onChange={e => setFullName(e.target.value)} />
+                    <label className="auth-floating-label">{t('auth_full_name')}</label>
+                  </div>
+                  <div className="relative">
+                    <input type="email" required className="auth-input peer" placeholder=" " value={email} onChange={e => setEmail(e.target.value)} />
+                    <label className="auth-floating-label">{t('auth_email')}</label>
+                  </div>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} required className="auth-input peer pr-12" placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
+                    <label className="auth-floating-label">{t('auth_password')}</label>
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2E7D32] transition-transform active:scale-95">
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full animate-in fade-in slide-in-from-right-4 duration-500">
+                  <div className="relative md:col-span-1">
+                    <select required className="auth-select peer" value={country} onChange={e => setCountry(e.target.value)}>
+                      {WORLD_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_country')}</label>
+                  </div>
+                  <div className="relative md:col-span-1">
+                    <select required className="auth-select peer" value={role} onChange={e => setRole(e.target.value as UserRole)}>
+                      <option value={UserRole.SELLER}>🚜 {t('auth_seller')}</option>
+                      <option value={UserRole.BUYER}>🛒 {t('auth_buyer')}</option>
+                      <option value={UserRole.TRANSPORTER}>🚛 {t('auth_transporter')}</option>
+                      <option value={UserRole.EXTENSIONIST}>📋 {t('auth_extensionist')}</option>
+                      <option value={UserRole.STRATEGIC_PARTNER}>🤝 Parceiro(a)</option>
+                      <option value={UserRole.OTHER}>❓ {t('auth_other')}</option>
+                    </select>
+                    <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_role')}</label>
+                  </div>
+                  <div className="relative md:col-span-2">
+                    <select required className="auth-select peer" value={entityType} onChange={e => setEntityType(e.target.value as EntityType)}>
+                      <option value={EntityType.INDIVIDUAL}>👤 {t('auth_individual')}</option>
+                      <option value={EntityType.ASSOCIATION}>🤝 {t('auth_association')}</option>
+                      <option value={EntityType.COOPERATIVE}>🏢 {t('auth_cooperative')}</option>
+                      <option value={EntityType.COMPANY}>🏗️ {t('auth_company')}</option>
+                      <option value={EntityType.NGO_INTL}>🌍 {t('auth_ngo')}</option>
+                      <option value={EntityType.OTHER}>❓ {t('auth_other')}</option>
+                    </select>
+                    <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_entity_type')}</label>
+                  </div>
+
+                  {country === 'Moçambique' ? (
+                    <>
+                      <div className="relative md:col-span-1">
+                        <select className="auth-select peer" value={province} onChange={e => setProvince(e.target.value)}>
+                          <option value="">Selecione...</option>
+                          {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_province')}</label>
+                      </div>
+                      <div className="relative md:col-span-1">
+                        <select className="auth-select peer" value={district} onChange={e => setDistrict(e.target.value)}>
+                          <option value="">Selecione...</option>
+                          {(MOZ_GEOGRAPHY[province] || []).map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_district')}</label>
+                      </div>
+                      <div className="relative md:col-span-1">
+                        <input className="auth-input peer" placeholder=" " value={posto} onChange={e => setPosto(e.target.value)} />
+                        <label className="auth-floating-label">{t('auth_posto')}</label>
+                      </div>
+                      <div className="relative md:col-span-1">
+                        <input className="auth-input peer" placeholder=" " value={localidade} onChange={e => setLocalidade(e.target.value)} />
+                        <label className="auth-floating-label">{t('auth_localidade')}</label>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="relative md:col-span-2">
+                      <input className="auth-input peer" placeholder=" " value={partnerLocation} onChange={e => setPartnerLocation(e.target.value)} />
+                      <label className="auth-floating-label">{t('auth_intl_location')}</label>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6 w-full animate-in fade-in slide-in-from-right-4 duration-500 overflow-y-auto hidden-scroll pr-2">
+                  <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="relative">
+                      <div className="flex gap-2 items-center">
+                        <span className="bg-[#FAFAFA] border border-transparent px-4 rounded-[10px] flex items-center text-[14px] font-medium text-[#2E7D32] h-[48px]">{phoneMeta.prefix}</span>
+                        <div className="relative flex-1">
+                          <input className="auth-input peer" placeholder=" " value={phone} onChange={e => handlePhoneInput(e.target.value, setPhone, 'personal')} />
+                          <label className="auth-floating-label">{t('auth_phone_personal')}</label>
+                        </div>
+                      </div>
+                      {phoneWarning.personal && <span className="text-red-500 font-medium text-[11px] mt-2 block animate-in fade-in">{phoneWarning.personal}</span>}
+                    </div>
+
+                    <div className="relative">
+                      <div className="flex gap-2 items-center">
+                        <span className="bg-[#FAFAFA] border border-transparent px-4 rounded-[10px] flex items-center text-[14px] font-medium text-[#2E7D32] h-[48px]">{phoneMeta.prefix}</span>
+                        <div className="relative flex-1">
+                          <input className="auth-input peer" placeholder=" " value={commPhone} onChange={e => handlePhoneInput(e.target.value, setCommPhone, 'comm')} />
+                          <label className="auth-floating-label">{t('auth_phone_comm')}</label>
+                        </div>
+                      </div>
+                      {phoneWarning.comm && <span className="text-red-500 font-medium text-[11px] mt-2 block animate-in fade-in">{phoneWarning.comm}</span>}
+                    </div>
+                  </div>
+
+                  {role === UserRole.SELLER && (
+                    <div className="space-y-3 md:col-span-2 pt-2">
+                       <label className="block text-[13px] font-semibold text-[#6D6D6D] uppercase tracking-wider">{t('auth_categories')}</label>
+                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                         {CATEGORIES.map(cat => (
+                           <button
+                             key={cat.id}
+                             type="button"
+                             onClick={() => setSelectedCategories(prev => prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id])}
+                             className={`p-3 rounded-xl border flex items-center gap-2 text-[13px] font-medium transition-all active:scale-95 ${selectedCategories.includes(cat.id) ? 'border-[#2E7D32] bg-[#F1F8F4] text-[#1B5E20] shadow-[0_4px_14px_rgba(46,125,50,0.15)] -translate-y-1' : 'border-[#E0E0E0] bg-white text-[#6D6D6D] hover:bg-[#FAFAFA] hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:-translate-y-1'}`}
+                           >
+                             <span className="text-lg">{cat.icon}</span> {cat.name}
+                           </button>
+                         ))}
+                       </div>
+                    </div>
+                  )}
+
+                  {(entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) && (
+                    <div className="bg-[#FAFAFA] p-6 rounded-[12px] border border-gray-100 space-y-5 md:col-span-2">
+                       <h4 className="text-[13px] font-semibold text-[#1C1C1C] flex items-center gap-2">📑 {t('auth_business_docs')}</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={nuit} onChange={e => setNuit(e.target.value)} /><label className="auth-floating-label">{t('auth_nuit')}</label></div>
+                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={alvara} onChange={e => setAlvara(e.target.value)} /><label className="auth-floating-label">{t('auth_alvara')}</label></div>
+                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={estatuto} onChange={e => setEstatuto(e.target.value)} /><label className="auth-floating-label">{t('auth_estatuto')}</label></div>
+                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={boletim} onChange={e => setBoletim(e.target.value)} /><label className="auth-floating-label">{t('auth_boletim')}</label></div>
+                       </div>
+                    </div>
+                  )}
+
+                  {(role === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) && (
+                    <div className="space-y-3 md:col-span-2">
+                       <label className="block text-[13px] font-semibold text-[#6D6D6D] uppercase tracking-wider">{t('auth_logo_upload')}</label>
+                       <div className="flex gap-4 items-center">
+                          <div className="w-16 h-16 bg-[#FAFAFA] border-2 border-dashed border-gray-300 rounded-[12px] flex flex-col items-center justify-center text-gray-400 relative overflow-hidden group hover:border-[#2E7D32] transition-colors cursor-pointer active:scale-95">
+                             {partnerLogo ? (
+                               <img src={partnerLogo} className="w-full h-full object-cover" />
+                             ) : (
+                               <Upload size={20} className="group-hover:text-[#2E7D32] transition-colors" />
+                             )}
+                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => {
+                               const file = e.target.files?.[0];
+                               if (file) {
+                                 const reader = new FileReader();
+                                 reader.onloadend = () => setPartnerLogo(reader.result as string);
+                                 reader.readAsDataURL(file);
+                               }
+                             }} />
+                          </div>
+                          <div className="relative flex-1">
+                            <input className="auth-input peer" placeholder=" " value={partnerLogo} onChange={e => setPartnerLogo(e.target.value)} />
+                            <label className="auth-floating-label">URL do Logótipo (Opcional)</label>
+                          </div>
+                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Botões do Signup */}
+              <div className="flex items-center gap-4 border-t border-gray-50 pt-8 mt-10 bg-white z-10 w-full relative">
+                {step > 1 && (
+                  <button type="button" onClick={prevStep} className="btn-secondary w-full group py-3">
+                    <ArrowLeft size={20} className="transition-transform duration-300 group-hover:-translate-x-1 mr-2" />
+                    <span>Voltar</span>
+                  </button>
+                )}
+                {step < 3 ? (
+                  <button type="button" onClick={nextStep} className="btn-primary w-full shadow-[0_4px_14px_rgba(27,94,32,0.25)] group py-3">
+                    <span>Próximo</span>
+                    <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-1 ml-2" />
+                  </button>
+                ) : (
+                  <button type="button" onClick={handleAuth} disabled={loading} className="btn-primary w-full shadow-[0_4px_14px_rgba(27,94,32,0.25)] group py-3">
+                    {loading ? 'A processar...' : 'Confirmar Cadastro'}
+                    {!loading && <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-1 ml-2" />}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </form>
       </div>
+
       <style>{`
-        .auth-label { display: block; font-size: 9px; font-weight: 900; color: #B0BEC5; text-transform: none; letter-spacing: 0.2em; margin-left: 0.5rem; }
-        .auth-input { width: 100%; padding: 1.25rem; border-radius: 1.75rem; border: 3px solid #F5F5F5; background-color: #FAFAFA; font-size: 0.9rem; font-weight: 800; color: #2E5C4E; outline: none; }
-        .auth-input:focus { border-color: #5B8C51; background-color: white; }
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap');
+        
+        .hidden-scroll::-webkit-scrollbar { width: 0px; background: transparent; }
+        
+        .auth-input { 
+          width: 100%; 
+          height: 48px;
+          padding: 20px 16px 4px 16px; 
+          border-radius: 10px; 
+          border: 1px solid transparent; 
+          background-color: #FAFAFA; 
+          font-family: 'Inter', sans-serif;
+          font-size: 14px; 
+          font-weight: 500;
+          color: #1C1C1C; 
+          outline: none; 
+          transition: all 0.3s ease;
+        }
+        .auth-select {
+          width: 100%; 
+          height: 48px;
+          padding: 20px 16px 4px 12px; 
+          border-radius: 10px; 
+          border: 1px solid transparent; 
+          background-color: #FAFAFA; 
+          font-family: 'Inter', sans-serif;
+          font-size: 14px; 
+          font-weight: 600;
+          color: #2E7D32; 
+          outline: none; 
+          transition: all 0.3s ease;
+        }
+
+        .auth-input:hover, .auth-select:hover { background-color: #F1F1F1; }
+        
+        .auth-input:focus, .auth-select:focus { 
+          border-color: #2E7D32; 
+          box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.08); 
+          background-color: #FFFFFF;
+        }
+        
+        .auth-floating-label { 
+          position: absolute; 
+          left: 16px; 
+          top: 14px; 
+          font-family: 'Inter', sans-serif;
+          font-size: 14px; 
+          color: #8E8E8E; 
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+          pointer-events: none; 
+        }
+
+        /* Magia do Floating Label Ativo */
+        .auth-input:focus ~ .auth-floating-label, 
+        .auth-input:not(:placeholder-shown) ~ .auth-floating-label {
+          top: 6px; 
+          font-size: 10px; 
+          color: #2E7D32; 
+          font-weight: 600;
+          letter-spacing: 0.02em;
+        }
+
+        .btn-primary {
+          background-color: #1B5E20;
+          color: white;
+          border-radius: 10px;
+          padding: 12px 24px;
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 15px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+        .btn-primary:hover:not(:disabled) { background-color: #0D3B12; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(27,94,32,0.3); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .btn-secondary {
+          background-color: transparent;
+          color: #6D6D6D;
+          border-radius: 10px;
+          padding: 12px 24px;
+          border: 1px solid #E0E0E0;
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 15px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btn-secondary:active { transform: scale(0.97); }
+        .btn-secondary:hover { background-color: #FAFAFA; color: #1C1C1C; border-color: #D1D5DB; }
       `}</style>
     </div>
   );

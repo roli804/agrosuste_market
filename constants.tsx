@@ -46,7 +46,6 @@ export const MOCK_USERS: User[] = [
 export const MOCK_PRODUCTS: Product[] = [
   // CEREAIS (cat 1)
   { id: 'p1', producerId: 's1', categoryId: '1', name: 'Milho Branco de Cuamba', description: 'Milho branco seco de alta qualidade, peneirado e pronto para moagem.', price: 1550, unit: 'Saco 50kg', stock: 120, images: ['https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80&w=800'], isDried: true },
-  { id: 'p2', producerId: 's1', categoryId: '1', name: 'Arroz Carolino da Zambézia', description: 'Arroz branco de grão longo, colheita recente. Ideal para exportação.', price: 2200, unit: 'Saco 50kg', stock: 80, images: ['https://images.unsplash.com/photo-1536304993881-ff86e0c9f27a?auto=format&fit=crop&q=80&w=800'], isDried: true },
   // LEGUMINOSAS (cat 2)
-  { id: 'p5', producerId: 's1', categoryId: '2', name: 'Feijão Nhemba de Chimoio', description: 'Feijão nhemba seco de primeira qualidade, rico em proteínas. Muito procurado no mercado regional.', price: 1800, unit: 'Saco 50kg', stock: 90, images: ['https://images.unsplash.com/photo-1612257999756-4f6792c7a1b7?auto=format&fit=crop&q=80&w=800'], isDried: true }
+  { id: 'p5', producerId: 's1', categoryId: '2', name: 'Feijão Nhemba de Chimoio', description: 'Feijão nhemba seco de primeira qualidade, rico em proteínas. Muito procurado no mercado regional.', price: 1800, unit: 'Saco 50kg', stock: 90, images: ['https://tse1.mm.bing.net/th/id/OIP.hNiFCNHZo8OagT2mMWdf0wHaHa?w=1426&h=1426&rs=1&pid=ImgDetMain&o=7&rm=3'], isDried: true }
 ];
