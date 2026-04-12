@@ -110,22 +110,17 @@ const AppContent: React.FC = () => {
     window.addEventListener('mock-db-changed', handleDbChange);
 
     const fetchSession = async () => {
+      // FORÇAR LIMPEZA DE SESSÃO AO ATUALIZAR/ABRIR A PÁGINA (Requisito: Refresh reseta para a Home)
+      localStorage.removeItem('mock_user');
+      await supabase.auth.signOut();
+      setUser(null);
+
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Since we explicitly signed out above, there is no session to fetch for automatic login
+        // But we still need to fetch public data like partners
 
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (session?.user) {
-          setUser(mapUserFromSession(session.user));
-        } else {
-          // Fallback para mock local se não houver sessão Supabase ativa
-          const mockUser = localStorage.getItem('mock_user');
-          if (mockUser) {
-            setUser(mapUserFromSession(JSON.parse(mockUser)));
-          }
-        }
+        // The mock local fallback block below is disabled for user sessions to ensure hard-resets on reload, 
+        // but we still fetch the partners list below.
 
         // Fetch partners
         const { data: profiles, error: partnersError } = await supabase.from('profiles').select('*').eq('role', UserRole.STRATEGIC_PARTNER);
@@ -161,12 +156,7 @@ const AppContent: React.FC = () => {
       } catch (err: any) {
         console.error("Erro de Acesso:", err);
         // Se der Failed to fetch, carrega o mock na mesma se existir
-        const mockUser = localStorage.getItem('mock_user');
-        if (mockUser) {
-          setUser(mapUserFromSession(JSON.parse(mockUser)));
-        } else {
-          setError("Não foi possível conectar ao servidor real. As funcionalidades poderão estar limitadas a testes locais.");
-        }
+        setError("Não foi possível conectar ao servidor real. As funcionalidades poderão estar limitadas a testes locais.");
         setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
       } finally {
         setLoading(false);
@@ -223,12 +213,13 @@ const AppContent: React.FC = () => {
   };
 
   const RoleBasedHome = () => {
-    if (!user) return <Home addToCart={addToCart} products={products} partners={partners} />;
+    const isPublicView = location.search.includes('view=public');
+    if (!user || isPublicView) return <Home addToCart={addToCart} products={products} partners={partners} />;
 
     switch (user.role) {
       case UserRole.ADMIN:
       case UserRole.STRATEGIC_PARTNER:
-        return <AdminDashboard products={products} user={user} />;
+        return <AdminDashboard products={products} user={user} onAddProduct={(p) => setProducts([p, ...products])} />;
       case UserRole.SELLER:
       case UserRole.TRANSPORTER:
       case UserRole.EXTENSIONIST:
@@ -238,7 +229,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const isAdminView = user && [UserRole.ADMIN, UserRole.STRATEGIC_PARTNER].includes(user.role) && location.pathname === '/';
+  const isAdminView = user && [UserRole.ADMIN, UserRole.STRATEGIC_PARTNER].includes(user.role) && location.pathname === '/' && !location.search.includes('view=public');
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
@@ -252,9 +243,7 @@ const AppContent: React.FC = () => {
 
             <div className="hidden lg:flex items-center gap-6">
               <Link to="/" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Início</Link>
-              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Soluções</Link>
-              <Link to="/mercados" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Mercados</Link>
-              <Link to="/sobre" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Sobre Nós</Link>
+              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Mercados</Link>
               <Link to="/relatorios-publicos" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Recursos</Link>
             </div>
 
@@ -336,7 +325,6 @@ const AppContent: React.FC = () => {
                 <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
                   <Link to="/shop" className="hover:text-[#2E7D32] transition-colors w-fit">Marketplace</Link>
                   <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Financiamento</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">ESG</Link>
                 </div>
               </div>
 
@@ -352,10 +340,8 @@ const AppContent: React.FC = () => {
               <div>
                 <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Empresa</h4>
                 <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Sobre nós</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Blog</Link>
+                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Termos de Uso</Link>
                   <Link to="/relatorios-publicos" className="hover:text-[#2E7D32] transition-colors w-fit">Impacto</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Suporte e Conta</Link>
                 </div>
               </div>
             </div>

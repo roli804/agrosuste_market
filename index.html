@@ -83,6 +83,151 @@
         .animate-marquee:hover {
             animation-play-state: paused;
         }
+
+        /* --- PREMIUM SAAS DESIGN SYSTEM (Scoped via .theme-premium or specific classes) --- */
+        .premium-card {
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+            border: 1px solid #F0F0F0;
+        }
+
+        .premium-btn {
+            background-color: #1B5E20;
+            color: #FFFFFF;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px rgba(27, 94, 32, 0.2);
+            outline: none;
+            cursor: pointer;
+        }
+        .premium-btn:hover {
+            background-color: #0D3B12;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(27, 94, 32, 0.3);
+        }
+        .premium-btn:active {
+            transform: scale(0.97);
+        }
+
+        .premium-input {
+            width: 100%;
+            height: 48px;
+            border-radius: 10px;
+            background-color: #FAFAFA;
+            border: 1px solid transparent;
+            padding: 0 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1C1C1C;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .premium-input:focus {
+            border: 1px solid #2E7D32;
+            background-color: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(46,125,50,0.08);
+        }
+
+        .premium-table th {
+            text-align: left;
+            padding: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6D6D6D;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background-color: #FAFAFA;
+            border-bottom: 2px solid #E0E0E0;
+        }
+        .premium-table td {
+            padding: 16px;
+            border-bottom: 1px solid #F0F0F0;
+            transition: background-color 0.2s;
+        }
+        .premium-table tbody tr:hover td {
+            background-color: #F8FBF8;
+        }
+
+        /* Floating Label CSS Strategy */
+        .premium-floating-label { position: relative; }
+        .premium-floating-label label {
+            position: absolute;
+            left: 12px;
+            top: -8px;
+            background: white;
+            padding: 0 4px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #A0A0A0;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        /* Marketplace & Product Card Refinement */
+        .shop-card {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .shop-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+            border-color: #2E7D32;
+        }
+        .shop-card-img-wrapper {
+            position: relative;
+            width: 100%;
+            height: 180px;
+            overflow: hidden;
+        }
+        .shop-card-img {
+            width: 100%;
+            height: 100%;
+            object-cover: cover;
+            transition: transform 0.6s ease;
+        }
+        .shop-card:hover .shop-card-img {
+            transform: scale(1.1);
+        }
+        .sidebar-link {
+            width: 100%;
+            text-align: left;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            items-center: center;
+            gap: 12px;
+        }
+        .sidebar-link.active {
+            background-color: #2E7D32;
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+        }
+        .sidebar-link:not(.active) {
+            color: #6D6D6D;
+        }
+        .sidebar-link:not(.active):hover {
+            background-color: #F5F5F0;
+            color: #1C1C1C;
+        }
+
+        /* Enforce elegant fonts on theme-premium */
+        .theme-premium {
+            font-family: 'Inter', sans-serif;
+            color: #1C1C1C;
+        }
     </style>
 </head>
 

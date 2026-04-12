@@ -42,6 +42,10 @@ const Auth: React.FC = () => {
       setMode('signup');
       setRole(UserRole.SELLER);
       setEntityType(EntityType.INDIVIDUAL);
+    } else if (roleParam === 'strategic_partner') {
+      setMode('signup');
+      setRole(UserRole.STRATEGIC_PARTNER);
+      setEntityType(EntityType.INSTITUTION);
     }
   }, [location.search]);
   const [phone, setPhone] = useState('');
@@ -249,7 +253,14 @@ const Auth: React.FC = () => {
           balance: 0
         });
 
+        // Prevenir sessão automática de signup
+        await supabase.auth.signOut();
         resetForm();
+        if (finalRole === UserRole.STRATEGIC_PARTNER) {
+          window.location.href = '/'; // Redirecionar para home e parceiros
+          return;
+        }
+        setMode('login');
         setShowSuccessMessage(true);
       }
     } catch (err: any) {
@@ -330,17 +341,14 @@ const Auth: React.FC = () => {
             description: `Novo utilizador ${newMockUser.fullName} (${newMockUser.role}) registado.`
           });
 
-          localStorage.setItem('mock_user', JSON.stringify({
-            id: newMockUser.id,
-            email: newMockUser.email,
-            user_metadata: {
-              full_name: newMockUser.fullName,
-              role: newMockUser.role,
-              entity_name: newMockUser.entityName
-            }
-          }));
-
-          window.location.href = '/';
+          // Não forçar login automático após registo em mock
+          resetForm();
+          if (finalRole === UserRole.STRATEGIC_PARTNER) {
+            window.location.href = '/'; 
+            return;
+          }
+          setMode('login');
+          setShowSuccessMessage(true);
           return;
         }
       }

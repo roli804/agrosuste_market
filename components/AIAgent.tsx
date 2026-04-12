@@ -120,12 +120,13 @@ const AIAgent: React.FC = () => {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          className="w-16 h-16 bg-[#2E5C4E] text-white rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all group relative"
+          className="w-12 h-12 bg-white/10 backdrop-blur-xl text-[#2E7D32] rounded-full flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 hover:scale-110 active:scale-95 transition-all group relative overflow-hidden"
         >
-          <Bot size={32} />
-          <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
-          <span className="absolute right-20 bg-gray-900 text-white text-[8px] font-semibold   px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            {t('ai_agent_title')}
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#2E7D32]/5 to-transparent"></div>
+          <Bot size={22} className="relative z-10" />
+          <div className="absolute top-2 right-2 w-2 h-2 bg-[#2E7D32] rounded-full border border-white animate-pulse z-20"></div>
+          <span className="absolute right-16 bg-[#1C1C1C] text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none tracking-tight">
+            Assistente IA
           </span>
         </button>
       )}

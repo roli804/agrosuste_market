@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, UserRole, EntityType, Order, ActivityLog, LogType } from '../types';
 import { MOZ_GEOGRAPHY, PLATFORM_COMMISSION_RATE, MOCK_USERS } from '../constants';
@@ -7,10 +7,11 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-
+import Logo from '../components/Logo';
 interface AdminDashboardProps {
   products: any[];
-  user: User | null; // Add user prop for authorization
+  user: User | null;
+  onAddProduct?: (p: any) => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
@@ -32,6 +33,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     entityType: EntityType.INDIVIDUAL
   });
 
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    price: '',
+    stock: '',
+    unit: 'Kg',
+    categoryId: '1',
+    description: '',
+    isDried: false
+  });
+
+  const [newPartner, setNewPartner] = useState({
+    entityName: '',
+    email: '',
+    phone: '',
+    location: ''
+  });
+
   // Filtros de Relatorio
   const [filterProvince, setFilterProvince] = useState('');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
@@ -51,6 +69,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
       fetchOperationalData();
     }
   }, [user, isAuthorized]);
+
+  const handleLogout = async () => {
+    localStorage.removeItem('mock_user');
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
 
   const generatePDF = () => {
     const doc = new jsPDF();
@@ -244,41 +268,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     setLoading(false);
   };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddNewEntity = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = `admin-reg-${Date.now()}`;
-    const userToSave: User = {
-      ...newUser,
-      id,
-      commercialPhone: newUser.phone,
-      country: 'Moçambique',
-      status: 'active',
-      isApproved: true,
-      balance: 0,
-      linkedAccounts: [],
-      entityName: newUser.fullName
-    };
-
-    mockDb.saveUser(userToSave);
-    mockDb.logActivity({
-      userId: user?.id || 'admin',
-      userName: user?.fullName || 'Admin',
-      userRole: UserRole.ADMIN,
-      type: LogType.SIGNUP,
-      description: `Administrador registou manualmente o utilizador ${newUser.fullName} (${newUser.role}).`
-    });
-
-    setUsers(prev => [...prev, userToSave]);
-    setShowAddModal(false);
-    setNewUser({
-      email: '',
-      fullName: '',
-      phone: '',
-      role: UserRole.BUYER,
-      province: '',
-      district: '',
-      entityType: EntityType.INDIVIDUAL
-    });
+    if (activeTab === 'products') {
+      const id = `admin-prod-${Date.now()}`;
+      const prodToSave = {
+        id,
+        producerId: user?.id || 'admin',
+        producerName: user?.fullName || 'AgroSuste',
+        categoryId: newProduct.categoryId,
+        name: newProduct.name,
+        description: newProduct.description,
+        price: Number(newProduct.price),
+        unit: newProduct.unit,
+        stock: Number(newProduct.stock),
+        images: ['https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80'],
+        isDried: newProduct.isDried
+      };
+      if (onAddProduct) onAddProduct(prodToSave);
+      setShowAddModal(false);
+      setNewProduct({ name: '', price: '', stock: '', unit: 'Kg', categoryId: '1', description: '', isDried: false });
+    } else if (activeTab === 'partners') {
+      const id = `admin-part-${Date.now()}`;
+      const partner = {
+        id, email: newPartner.email, fullName: newPartner.entityName, phone: newPartner.phone, commercialPhone: newPartner.phone,
+        role: UserRole.STRATEGIC_PARTNER, entityType: EntityType.INSTITUTION, entityName: newPartner.entityName,
+        district: newPartner.location, province: newPartner.location, country: 'Moçambique', status: 'active', isApproved: true, balance: 0, linkedAccounts: []
+      };
+      mockDb.saveUser(partner as any);
+      setUsers(prev => [...prev, partner as any]);
+      setShowAddModal(false);
+      setNewPartner({ entityName: '', email: '', phone: '', location: '' });
+    } else {
+      const id = `admin-reg-${Date.now()}`;
+      let fixedRole = newUser.role;
+      if (activeTab === 'suppliers') fixedRole = UserRole.SELLER;
+      if (activeTab === 'buyers') fixedRole = UserRole.BUYER;
+      if (activeTab === 'transporters') fixedRole = UserRole.TRANSPORTER;
+      const userToSave: User = {
+        ...newUser,
+        role: fixedRole,
+        id, commercialPhone: newUser.phone, country: 'Moçambique', status: 'active', isApproved: true, balance: 0, linkedAccounts: [], entityName: newUser.fullName
+      };
+      mockDb.saveUser(userToSave);
+      setUsers(prev => [...prev, userToSave]);
+      setShowAddModal(false);
+      setNewUser({ email: '', fullName: '', phone: '', role: UserRole.BUYER, province: '', district: '', entityType: EntityType.INDIVIDUAL });
+    }
     alert('Entidade registada com sucesso!');
   };
 
@@ -356,28 +392,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
       <aside className="w-[260px] bg-white border-r border-[#E0E0E0] hidden md:flex flex-col h-full shrink-0 shadow-sm z-10">
         <div className="h-[80px] border-b border-[#E0E0E0] flex items-center justify-center">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">ðŸŒ±</span>
+            <Logo className="w-8 h-8" color="#2E7D32" />
             <span className="font-poppins font-bold text-lg text-[#1C1C1C] tracking-tight">AgroSuste <span className="text-[#2E7D32]">Admin</span></span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto hidden-scroll py-6 space-y-2">
           {renderSidebarItem('dashboard', <LayoutDashboard size={20} />, 'Dashboard')}
-          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">GestÃ£o de Perfis</p></div>
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Gestao de Perfis</p></div>
           {renderSidebarItem('users', <Users size={20} />, 'Utilizadores')}
           {renderSidebarItem('suppliers', <Store size={20} />, 'Fornecedores')}
           {renderSidebarItem('buyers', <ShoppingBag size={20} />, 'Compradores')}
           {renderSidebarItem('transporters', <Truck size={20} />, 'Transportadores')}
           {renderSidebarItem('partners', <ShieldCheck size={20} />, 'Parceiros Estrategicos')}
-          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">OperaÃ§Ãµes</p></div>
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Operacoes</p></div>
           {renderSidebarItem('products', <Package size={20} />, 'Produtos')}
           {renderSidebarItem('categories', <Folder size={20} />, 'Categorias')}
           {renderSidebarItem('orders', <FileText size={20} />, 'Pedidos')}
           {renderSidebarItem('logistics', <TrendingUp size={20} />, 'Logi­stica')}
           {renderSidebarItem('ratings', <Star size={20} />, 'Avaliacoes')}
           <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Sistema</p></div>
-          {renderSidebarItem('reports', <PieChart size={20} />, 'RelatÃ³rios Financeiros')}
+          {renderSidebarItem('reports', <PieChart size={20} />, 'Relatorios Financeiros')}
         </div>
-        <div className="p-6 border-t border-[#E0E0E0]">
+        <div className="p-6 border-t border-[#E0E0E0] space-y-4">
+          <button onClick={handleLogout} className="w-full flex justify-center items-center gap-2 py-3 bg-gray-50 border border-gray-100 text-[#6D6D6D] hover:bg-gray-100 hover:text-[#1C1C1C] transition-colors rounded-xl font-bold text-[13px]">
+            ← Voltar ao Ínicio
+          </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#2E7D32]/10 rounded-full flex items-center justify-center text-[#2E7D32] font-bold text-sm">
               {user?.fullName?.[0] || 'A'}
@@ -399,7 +438,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
             <h1 className="text-3xl font-poppins font-bold text-[#1C1C1C] capitalize">
               {activeTab.replace('_', ' ')}
             </h1>
-            <p className="text-sm text-[#6D6D6D] mt-1">VisÃ£o geral e gestÃ£o operacional do marketplace.</p>
+            <p className="text-sm text-[#6D6D6D] mt-1">Visao geral e gestao operacional do marketplace.</p>
           </div>
           {isAdmin && (
             <button onClick={() => setShowAddModal(true)} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-[0_8px_20px_rgba(46,125,50,0.2)] transition-all active:scale-95 flex items-center gap-2">
@@ -473,11 +512,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">IdentificaÃ§Ã£o</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Identificacao</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Tipo/Papel</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Contato</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Status</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">AÃ§Ãµes</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">Acções</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E0E0E0]/50">
@@ -552,7 +591,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                   {u.logo ? <img src={u.logo} alt={u.entityName} className="max-w-full max-h-full object-contain" /> : <ShieldCheck size={32} className="text-[#A0A0A0]" />}
                 </div>
                 <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg mb-1">{u.entityName || u.fullName}</h4>
-                <p className="text-xs text-[#6D6D6D] mb-4">Parceiro EstratÃ©gico &bull; {u.location || u.district || 'Global'}</p>
+                <p className="text-xs text-[#6D6D6D] mb-4">Parceiro Estrategico &bull; {u.location || u.district || 'Global'}</p>
                 <div className="mt-auto pt-4 border-t border-[#E0E0E0]/50 space-y-2">
                   <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Telefone</span><span className="font-medium text-[#1C1C1C]">{u.commercialPhone}</span></div>
                   <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Email</span><span className="font-medium text-[#1C1C1C] truncate ml-2">{u.email}</span></div>
@@ -578,23 +617,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
               </div>
               {/* Outros filtros minguados para manter layout focado, mas mantendo a lÃ³gica de state intacta para uso futuro */}
               <div className="flex gap-4">
-                <button onClick={generatePDF} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md transition-all active:scale-95">Exportar RelatÃ³rio PDF</button>
+                <button onClick={generatePDF} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md transition-all active:scale-95">Exportar Relatorio PDF</button>
               </div>
             </div>
             {/* Old legacy tables were removed but PDF keeps working since logical states exist */}
             <div className="p-12 text-center bg-white rounded-2xl border border-[#E0E0E0] shadow-sm">
               <PieChart size={48} className="mx-auto text-[#A0A0A0] mb-4 opacity-50" />
-              <h3 className="font-poppins text-xl font-bold text-[#1C1C1C] mb-2">RelatÃ³rios Detalhados</h3>
-              <p className="text-sm text-[#6D6D6D]">Exporte os relatÃ³rios PDF oficiais para analisar lucros, comissÃµes de parceiros e transaÃ§Ãµes do marketplace.</p>
+              <h3 className="font-poppins text-xl font-bold text-[#1C1C1C] mb-2">Relatorios Detalhados</h3>
+              <p className="text-sm text-[#6D6D6D]">Exporte os relatorios PDF oficiais para analisar lucros, comissoes de parceiros e transacoes do marketplace.</p>
             </div>
           </div>
         )}
 
         {['products', 'categories', 'orders', 'logistics', 'ratings', 'settings'].includes(activeTab) && (
           <div className="min-h-[50vh] flex flex-col items-center justify-center bg-white rounded-[20px] border border-[#E0E0E0]/50 border-dashed animate-in fade-in">
-            <span className="text-4xl mb-4 opacity-30 px-4 py-2 bg-gray-100 rounded-2xl filter grayscale">ðŸš§</span>
-            <h3 className="text-lg font-bold text-[#1C1C1C]">MÃ³dulo em Desenvolvimento</h3>
-            <p className="text-sm text-[#A0A0A0] max-w-sm text-center mt-2">Esta secÃ§Ã£o operativa faz parte da prÃ³xima fase de implantaÃ§Ã£o SaaS do AgroConnect.</p>
+            <span className="text-4xl mb-4 opacity-30 px-4 py-2 bg-gray-100 rounded-2xl filter grayscale">🚧</span>
+            <h3 className="text-lg font-bold text-[#1C1C1C]">Modulo em Desenvolvimento</h3>
+            <p className="text-sm text-[#A0A0A0] max-w-sm text-center mt-2">Esta seccao operativa faz parte da proxima fase de implantacao do AgroSuste.</p>
           </div>
         )}
 
@@ -612,7 +651,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                   <p className="text-xs font-medium text-[#A0A0A0] mt-1">{selectedUser.role} &bull; {selectedUser.status}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedUser(null)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">âœ•</button>
+              <button onClick={() => setSelectedUser(null)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">✕</button>
             </div>
             <div className="p-8 space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -639,31 +678,117 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="bg-white border-b border-[#E0E0E0] p-6 flex justify-between items-center">
               <h3 className="text-lg font-poppins font-bold text-[#1C1C1C]">Novo Registo Manual</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">âœ•</button>
+              <button onClick={() => setShowAddModal(false)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">✕</button>
             </div>
-            <form onSubmit={handleAddUser} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome Completo</label>
-                <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Tipo de Perfil</label>
-                  <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
-                    <option value={UserRole.SELLER}>Fornecedor/Vendedor</option>
-                    <option value={UserRole.BUYER}>Comprador</option>
-                    <option value={UserRole.TRANSPORTER}>Transportador</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Telefone</label>
-                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
-                </div>
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Registar Utilizador</button>
-              </div>
-            </form>
+              {/* CONDITIONAL FORMS FOR PRODUCTS */}
+              {activeTab === 'products' && (
+                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                  <div>
+                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome do Produto / Colheita</label>
+                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder="Ex: Batata Reno" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Preço (MZN)</label>
+                       <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
+                     </div>
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Unidade de Medida</label>
+                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} placeholder="Ex: Kg, Saco, Ton" />
+                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Quantidade em Stock</label>
+                       <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} />
+                     </div>
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Grão Seco / Armazenável?</label>
+                       <select className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.isDried ? 'true':'false'} onChange={e => setNewProduct({...newProduct, isDried: e.target.value === 'true'})}>
+                         <option value="false">Não Fresco/Perecível</option>
+                         <option value="true">Sim, Armazenável</option>
+                       </select>
+                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Descrição Adicional</label>
+                    <textarea rows={2} className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium resize-none transition-all" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Detalhes de Origem/Qualidade..." />
+                  </div>
+                  <div className="pt-4 flex gap-3">
+                    <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Publicar Produto no Catálogo</button>
+                  </div>
+                </form>
+              )}
+
+              {/* CONDITIONAL FORMS FOR STRATEGIC PARTNERS */}
+              {activeTab === 'partners' && (
+                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                   <div>
+                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome da Instituição/Organização</label>
+                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newPartner.entityName} onChange={e => setNewPartner({...newPartner, entityName: e.target.value})} placeholder="Agência de Cooperação Internacional" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email Corporativo</label>
+                       <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.email} onChange={e => setNewPartner({...newPartner, email: e.target.value})} />
+                     </div>
+                     <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Contacto Oficial</label>
+                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.phone} onChange={e => setNewPartner({...newPartner, phone: e.target.value})} />
+                     </div>
+                   </div>
+                   <div>
+                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Sede/Localização Geográfica</label>
+                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newPartner.location} onChange={e => setNewPartner({...newPartner, location: e.target.value})} placeholder="Província/Distrito de Operação" />
+                   </div>
+                   <div className="pt-4 flex gap-3">
+                     <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(37,99,235,0.2)] transition-all">Registar Parceiro Institucional</button>
+                   </div>
+                </form>
+              )}
+
+              {/* DEFAULT FOR USERS (BUYERS, SELLERS, TRANSPORTERS) */}
+              {(activeTab === 'users' || activeTab === 'suppliers' || activeTab === 'buyers' || activeTab === 'transporters' || activeTab === 'dashboard') && (
+                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome Completo</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email</label>
+                      <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Telefone Primário</label>
+                      <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Província</label>
+                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.province} onChange={e => setNewUser({ ...newUser, province: e.target.value })} />
+                    </div>
+                    <div>
+                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Distrito</label>
+                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.district} onChange={e => setNewUser({ ...newUser, district: e.target.value })} />
+                    </div>
+                  </div>
+                  {activeTab === 'users' && (
+                    <div>
+                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Tipo de Perfil Específico</label>
+                      <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
+                        <option value={UserRole.SELLER}>Fornecedor/Vendedor</option>
+                        <option value={UserRole.BUYER}>Comprador</option>
+                        <option value={UserRole.TRANSPORTER}>Transportador</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className="pt-4 flex gap-3">
+                    <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Concluir Adição de Perfil Oficial</button>
+                  </div>
+                </form>
+              )}
           </div>
         </div>
       )}

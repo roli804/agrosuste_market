@@ -119,11 +119,11 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 md:space-y-12 pb-24 px-4 md:px-0">
+    <div className="theme-premium max-w-4xl mx-auto space-y-6 md:space-y-12 pb-24 px-4 md:px-0">
 
       {step === 'review' && (
-        <div className="bg-white rounded-[2rem] md:rounded-[4rem] shadow-strong border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 mobile-full">
-          <div className="bg-[#2E5C4E] p-8 md:p-12 text-white flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="premium-card p-0 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+          <div className="bg-[#1B5E20] p-8 md:p-12 text-white flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div className="space-y-1 md:space-y-2">
               <h2 className="text-3xl md:text-4xl font-semibold mb-2 text-gray-900">{t('checkout_title')}</h2>
               <p className="text-[9px] md:text-[10px] font-bold opacity-50">{t('checkout_subtitle')}</p>
@@ -145,14 +145,14 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                 </div>
               ))}
             </div>
-            <button onClick={() => setStep('payment')} className="w-full bg-[#2E5C4E] text-white py-6 md:py-8 rounded-2xl md:rounded-[2.5rem] font-semibold text-[10px] md:text-xs   shadow-2xl hover:scale-[1.01] active:scale-95 transition-all">{t('checkout_choose_payment')}</button>
+            <button onClick={() => setStep('payment')} className="premium-btn w-full py-6 md:py-8 text-[12px] md:text-sm">{t('checkout_choose_payment')}</button>
           </div>
         </div>
       )}
 
       {step === 'payment' && (
-        <div className="bg-white rounded-[2rem] md:rounded-[4rem] shadow-strong border border-gray-100 overflow-hidden max-w-2xl mx-auto animate-in zoom-in-95 mobile-full">
-          <div className="bg-[#2E5C4E] p-8 md:p-12 text-white text-center">
+        <div className="premium-card p-0 overflow-hidden max-w-2xl mx-auto animate-in zoom-in-95">
+          <div className="bg-[#1B5E20] p-8 md:p-12 text-white text-center">
             <h2 className="text-2xl md:text-3xl font-semibold  ">{t('checkout_payment_channels')}</h2>
             <p className="text-[9px] md:text-[10px] font-bold opacity-50  mt-2  leading-loose">{t('checkout_official_gateway')}</p>
           </div>
@@ -182,7 +182,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                     onChange={(e) => setCardNumber(e.target.value)}
                     placeholder="0000 0000 0000 0000"
                     maxLength={19}
-                    className="w-full bg-white border-2 border-gray-200 p-4 md:p-6 rounded-xl md:rounded-2xl text-base md:text-lg font-bold focus:border-[#5B8C51] focus:ring-0 transition-all text-gray-900"
+                    className="premium-input text-base md:text-lg"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-6">
@@ -194,7 +194,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                       onChange={(e) => setCardExpiry(e.target.value)}
                       placeholder="MM/AA"
                       maxLength={5}
-                      className="w-full bg-white border-2 border-gray-200 p-6 rounded-2xl text-lg font-bold focus:border-[#5B8C51] focus:ring-0 transition-all text-gray-900"
+                      className="premium-input text-base"
                     />
                   </div>
                   <div>
@@ -205,7 +205,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                       onChange={(e) => setCardCvv(e.target.value)}
                       placeholder="123"
                       maxLength={4}
-                      className="w-full bg-white border-2 border-gray-200 p-6 rounded-2xl text-lg font-bold focus:border-[#5B8C51] focus:ring-0 transition-all text-gray-900"
+                      className="premium-input text-base"
                     />
                   </div>
                 </div>
@@ -235,7 +235,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                         setPhoneNumber(val);
                     }}
                     placeholder={method === PaymentMethod.MPESA ? t('checkout_phone_hint_mpesa') : t('checkout_phone_hint_emola')}
-                    className="w-full bg-white border-2 border-gray-200 p-4 md:p-6 pl-20 md:pl-24 rounded-xl md:rounded-2xl text-base md:text-lg font-bold focus:border-[#5B8C51] focus:ring-0 transition-all text-gray-900"
+                    className="premium-input pl-20 md:pl-24 text-base md:text-lg"
                   />
                 </div>
                 {phoneNumber.length > 0 && (
@@ -251,10 +251,10 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
             <button 
               onClick={handleStartPayment} 
               disabled={method === PaymentMethod.BANK_LOCAL ? (!cardNumber || !cardExpiry || !cardCvv) : (!phoneNumber || phoneNumber.length !== 9)} 
-              className={`w-full py-6 md:py-8 rounded-2xl md:rounded-[2.5rem] font-semibold text-[10px] md:text-xs   shadow-2xl transition-all ${
+              className={`premium-btn w-full py-6 md:py-8 ${
                 (method === PaymentMethod.BANK_LOCAL ? (cardNumber && cardExpiry && cardCvv) : (phoneNumber && phoneNumber.length === 9)) 
-                  ? 'bg-[#5B8C51] text-white hover:bg-[#2E5C4E]' 
-                  : 'bg-gray-100 text-gray-300'
+                  ? '' 
+                  : 'bg-[#F0F0F0] text-[#A0A0A0] shadow-none pointer-events-none'
               }`}
             >
               {(method === PaymentMethod.BANK_LOCAL ? (cardNumber && cardExpiry && cardCvv) : (phoneNumber && phoneNumber.length === 9)) 
