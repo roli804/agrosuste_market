@@ -1,4 +1,4 @@
-import { User, ActivityLog, LogType, UserRole } from '../types';
+import { User, ActivityLog, LogType, UserRole, DeliveryRequest, DeliveryStatus } from '../types';
 
 const USERS_KEY = 'agro_suste_profiles';
 const LOGS_KEY = 'agro_suste_activity_logs';
@@ -90,5 +90,36 @@ export const mockDb = {
         localStorage.setItem('agro_suste_products', JSON.stringify(filtered));
         window.dispatchEvent(new Event('mock-db-changed'));
         return true;
+    },
+
+    // --- DELIVERY REQUESTS ---
+    getDeliveryRequests: (): DeliveryRequest[] => {
+        const data = localStorage.getItem('agro_suste_delivery_requests');
+        return data ? JSON.parse(data) : [];
+    },
+
+    saveDeliveryRequest: (request: DeliveryRequest) => {
+        const requests = mockDb.getDeliveryRequests();
+        const index = requests.findIndex(r => r.id === request.id);
+        if (index >= 0) {
+            requests[index] = { ...requests[index], ...request };
+        } else {
+            requests.push(request);
+        }
+        localStorage.setItem('agro_suste_delivery_requests', JSON.stringify(requests));
+        window.dispatchEvent(new Event('mock-db-changed'));
+    },
+
+    updateDeliveryStatus: (id: string, status: DeliveryStatus, driverId?: string) => {
+        const requests = mockDb.getDeliveryRequests();
+        const index = requests.findIndex(r => r.id === id);
+        if (index >= 0) {
+            requests[index].status = status;
+            if (driverId) requests[index].assigned_driver_id = driverId;
+            localStorage.setItem('agro_suste_delivery_requests', JSON.stringify(requests));
+            window.dispatchEvent(new Event('mock-db-changed'));
+            return true;
+        }
+        return false;
     }
 };

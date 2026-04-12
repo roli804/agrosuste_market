@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { supabase, supabaseTableStates } from '../lib/supabase';
 import { User, UserRole, EntityType, Order, ActivityLog, LogType } from '../types';
-import { MOZ_GEOGRAPHY, PLATFORM_COMMISSION_RATE, MOCK_USERS } from '../constants';
+import { MOZ_GEOGRAPHY, PLATFORM_COMMISSION_RATE, MOCK_USERS, CATEGORIES } from '../constants';
 import { mockDb } from '../lib/mock_db';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store, MapPin, Eye, XCircle } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import Logo from '../components/Logo';
+import { DeliveryRequest, DeliveryStatus } from '../types';
+import DeliveryStatusTimeline from '../components/DeliveryStatusTimeline';
 interface AdminDashboardProps {
   products: any[];
   user: User | null;
@@ -15,10 +18,13 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'suppliers' | 'buyers' | 'transporters' | 'products' | 'categories' | 'orders' | 'logistics' | 'ratings' | 'settings'>('dashboard');
   const [users, setUsers] = useState<User[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [deliveryRequests, setDeliveryRequests] = useState<DeliveryRequest[]>([]);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -40,7 +46,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     unit: 'Kg',
     categoryId: '1',
     description: '',
-    isDried: false
+    isDried: false,
+    image: ''
+  });
+
+  const [categories, setCategories] = useState(() => {
+    const saved = localStorage.getItem('agro_suste_categories');
+    return saved ? JSON.parse(saved) : CATEGORIES;
+  });
+
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    icon: '📦'
   });
 
   const [newPartner, setNewPartner] = useState({
@@ -76,6 +93,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     window.location.href = '/';
   };
 
+  const handleBackHome = async () => {
+     // Fazer logout automático ao sair do painel de admin
+     await handleLogout();
+  };
+
   const generatePDF = () => {
     const doc = new jsPDF();
     const timestamp = new Date().toLocaleString('pt-MZ');
@@ -86,9 +108,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('AGRO-SUSTE MOÃ‡AMBIQUE', 105, 20, { align: 'center' });
+    doc.text('AGRO-SUSTE MOÇAMBIQUE', 105, 20, { align: 'center' });
     doc.setFontSize(10);
-    doc.text('RELATÓRIO OFICIAL DE OPERAÇÕES • NÚCLEO CENTRAL', 105, 30, { align: 'center' });
+    doc.text(t('admin_pdf_footer'), 105, 30, { align: 'center' });
 
     // Report Info
     doc.setTextColor(0, 0, 0);
@@ -143,7 +165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(`PÃ¡gina ${i} de ${pageCount} â€¢ ${t('admin_pdf_footer')} `, 105, 285, { align: 'center' });
+      doc.text(`${t('admin_reports_finance')} - Page ${i} of ${pageCount} • AgroSuste`, 105, 285, { align: 'center' });
     }
 
     doc.save(`Relatorio_AgroSuste_${reportType}_${new Date().getTime()}.pdf`);
@@ -218,6 +240,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     setLoading(true);
 
     // 1. Fetch Users from Supabase
+    if (supabaseTableStates.profilesMissing) {
+       setLoading(false);
+       return; 
+    }
     let allUsers: User[] = [];
     try {
       const { data: dbUsers, error } = await supabase.from('profiles').select('*');
@@ -242,8 +268,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           linkedAccounts: u.linked_accounts || []
         }));
       }
-    } catch (e) {
-      console.error("Erro ao procurar perfis no Supabase:", e);
+    } catch (e: any) {
+      if (e?.code === 'PGRST205' || e?.message?.includes('profiles')) {
+        supabaseTableStates.profilesMissing = true;
+        console.log("[AgroSuste] AdminDashboard: Tabela 'profiles' não encontrada no Supabase. Usando Mocks.");
+      } else {
+        console.error("Erro ao procurar perfis no Supabase:", e);
+      }
     }
 
     // 2. Merge with Local Mock Users
@@ -256,7 +287,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         mergedUsers.push(lu);
       }
     });
-
     setUsers(mergedUsers);
     setActivityLogs(mockDb.getLogs());
 
@@ -266,6 +296,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
     }
 
     setLoading(false);
+  };
+
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = (categories.length + 1).toString();
+    const cat = { id, name: newCategory.name, icon: newCategory.icon, is_active: true };
+    const updated = [...categories, cat];
+    setCategories(updated);
+    localStorage.setItem('agro_suste_categories', JSON.stringify(updated));
+    setNewCategory({ name: '', icon: '📦' });
+    setShowAddModal(false);
+    alert('Categoria adicionada com sucesso!');
+  };
+
+  const handleDeleteProduct = (prodId: string) => {
+    if (window.confirm('Tem a certeza que deseja eliminar este produto?')) {
+      // In a real app, this would delete from DB. In mock, we rely on the parent state.
+      // But we can simulate a refresh by having the parent handle the delete if we had a prop.
+      // For now, let's at least log it and alert.
+      alert('Funcionalidade de eliminar produto em processamento...');
+    }
   };
 
   const handleAddNewEntity = (e: React.FormEvent) => {
@@ -278,16 +329,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         producerName: user?.fullName || 'AgroSuste',
         categoryId: newProduct.categoryId,
         name: newProduct.name,
-        description: newProduct.description,
+        description: newProduct.description || newProduct.name,
         price: Number(newProduct.price),
         unit: newProduct.unit,
         stock: Number(newProduct.stock),
-        images: ['https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80'],
-        isDried: newProduct.isDried
+        images: [newProduct.image || 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80'],
+        isDried: newProduct.isDried,
+        isAdminProduct: true,
+        createdAt: new Date().toISOString()
       };
+      // 1. Persistir no mockDb (localStorage) — isto aciona o listener no App.tsx
+      mockDb.saveProduct(prodToSave);
+      // 2. Propagar para o estado global via callback
       if (onAddProduct) onAddProduct(prodToSave);
+      // 3. Registar actividade
+      mockDb.logActivity({
+        userId: user?.id || 'admin',
+        userName: user?.fullName || 'Admin',
+        userRole: UserRole.ADMIN,
+        type: LogType.PRODUCT_ADD,
+        description: `Admin publicou produto: ${prodToSave.name} (${prodToSave.unit}) — ${prodToSave.price} MZN`
+      });
       setShowAddModal(false);
-      setNewProduct({ name: '', price: '', stock: '', unit: 'Kg', categoryId: '1', description: '', isDried: false });
+      setNewProduct({ name: '', price: '', stock: '', unit: 'Kg', categoryId: '1', description: '', isDried: false, image: '' });
+      alert(`✅ Produto "${prodToSave.name}" publicado com sucesso no catálogo!`);
+      return;
+    } else if (activeTab === 'categories') {
+        handleAddCategory(e);
+        return;
     } else if (activeTab === 'partners') {
       const id = `admin-part-${Date.now()}`;
       const partner = {
@@ -296,6 +365,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         district: newPartner.location, province: newPartner.location, country: 'Moçambique', status: 'active', isApproved: true, balance: 0, linkedAccounts: []
       };
       mockDb.saveUser(partner as any);
+      mockDb.logActivity({
+        userId: user?.id || 'admin',
+        userName: user?.fullName || 'Admin',
+        userRole: UserRole.ADMIN,
+        type: LogType.OTHER,
+        description: `Admin registou novo parceiro: ${partner.entityName}`
+      });
       setUsers(prev => [...prev, partner as any]);
       setShowAddModal(false);
       setNewPartner({ entityName: '', email: '', phone: '', location: '' });
@@ -311,11 +387,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         id, commercialPhone: newUser.phone, country: 'Moçambique', status: 'active', isApproved: true, balance: 0, linkedAccounts: [], entityName: newUser.fullName
       };
       mockDb.saveUser(userToSave);
+      mockDb.logActivity({
+        userId: user?.id || 'admin',
+        userName: user?.fullName || 'Admin',
+        userRole: UserRole.ADMIN,
+        type: LogType.SIGNUP,
+        description: `Admin registou manualmente o utilizador: ${userToSave.fullName} (${fixedRole})`
+      });
       setUsers(prev => [...prev, userToSave]);
       setShowAddModal(false);
       setNewUser({ email: '', fullName: '', phone: '', role: UserRole.BUYER, province: '', district: '', entityType: EntityType.INDIVIDUAL });
     }
-    alert('Entidade registada com sucesso!');
+    alert('✅ Entidade registada com sucesso!');
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
@@ -370,7 +453,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           <h2 className="text-4xl font-semibold text-gray-900  ">{t('hero_cta_auth')}</h2>
           <p className="text-gray-400 font-bold  text-[10px]  max-w-md mx-auto">{t('admin_no_records')}</p>
         </div>
-        <a href="#/auth" className="bg-[#2E5C4E] text-white px-12 py-6 rounded-3xl font-semibold text-[10px]   shadow-2xl hover:scale-105 transition-all">Iniciar SessÃƒÂ£o como Gestor</a>
+        <a href="#/auth" className="bg-[#2E5C4E] text-white px-12 py-6 rounded-3xl font-semibold text-[10px]   shadow-2xl hover:scale-105 transition-all">{t('admin_login_manager')}</a>
       </div>
     );
   }
@@ -393,29 +476,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         <div className="h-[80px] border-b border-[#E0E0E0] flex items-center justify-center">
           <div className="flex items-center gap-2">
             <Logo className="w-8 h-8" color="#2E7D32" />
-            <span className="font-poppins font-bold text-lg text-[#1C1C1C] tracking-tight">AgroSuste <span className="text-[#2E7D32]">Admin</span></span>
+            <span className="font-poppins font-bold text-lg text-[#1C1C1C] tracking-tight">AgroSuste <span className="text-[#2E7D32]">{language === 'pt' ? 'Admin' : 'Admin'}</span></span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto hidden-scroll py-6 space-y-2">
-          {renderSidebarItem('dashboard', <LayoutDashboard size={20} />, 'Dashboard')}
-          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Gestao de Perfis</p></div>
-          {renderSidebarItem('users', <Users size={20} />, 'Utilizadores')}
-          {renderSidebarItem('suppliers', <Store size={20} />, 'Fornecedores')}
-          {renderSidebarItem('buyers', <ShoppingBag size={20} />, 'Compradores')}
-          {renderSidebarItem('transporters', <Truck size={20} />, 'Transportadores')}
-          {renderSidebarItem('partners', <ShieldCheck size={20} />, 'Parceiros Estrategicos')}
-          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Operacoes</p></div>
-          {renderSidebarItem('products', <Package size={20} />, 'Produtos')}
-          {renderSidebarItem('categories', <Folder size={20} />, 'Categorias')}
-          {renderSidebarItem('orders', <FileText size={20} />, 'Pedidos')}
-          {renderSidebarItem('logistics', <TrendingUp size={20} />, 'Logi­stica')}
-          {renderSidebarItem('ratings', <Star size={20} />, 'Avaliacoes')}
-          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">Sistema</p></div>
-          {renderSidebarItem('reports', <PieChart size={20} />, 'Relatorios Financeiros')}
+          {renderSidebarItem('dashboard', <LayoutDashboard size={20} />, t('admin_dashboard'))}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_profiles')}</p></div>
+          {renderSidebarItem('users', <Users size={20} />, t('admin_users'))}
+          {renderSidebarItem('suppliers', <Store size={20} />, t('admin_suppliers'))}
+          {renderSidebarItem('buyers', <ShoppingBag size={20} />, t('admin_buyers'))}
+          {renderSidebarItem('transporters', <Truck size={20} />, t('admin_transporters'))}
+          {renderSidebarItem('partners', <ShieldCheck size={20} />, t('admin_partners_nav'))}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_ops_title_nav')}</p></div>
+          {renderSidebarItem('products', <Package size={20} />, t('admin_products'))}
+          {renderSidebarItem('categories', <Folder size={20} />, t('admin_categories'))}
+          {renderSidebarItem('orders', <FileText size={20} />, t('admin_orders'))}
+          {renderSidebarItem('logistics', <TrendingUp size={20} />, t('admin_logistics_nav'))}
+          {renderSidebarItem('ratings', <Star size={20} />, t('admin_ratings'))}
+          <div className="pt-4 pb-2 px-6"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_system')}</p></div>
+          {renderSidebarItem('reports', <PieChart size={20} />, t('admin_reports_finance'))}
         </div>
         <div className="p-6 border-t border-[#E0E0E0] space-y-4">
-          <button onClick={handleLogout} className="w-full flex justify-center items-center gap-2 py-3 bg-gray-50 border border-gray-100 text-[#6D6D6D] hover:bg-gray-100 hover:text-[#1C1C1C] transition-colors rounded-xl font-bold text-[13px]">
-            ← Voltar ao Ínicio
+          <button onClick={handleBackHome} className="w-full flex justify-center items-center gap-2 py-3 bg-gray-50 border border-gray-100 text-[#6D6D6D] hover:bg-gray-100 hover:text-[#1C1C1C] transition-colors rounded-xl font-bold text-[13px]">
+            {t('admin_back_home')}
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#2E7D32]/10 rounded-full flex items-center justify-center text-[#2E7D32] font-bold text-sm">
@@ -429,20 +512,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         </div>
       </aside>
 
+      {/* MOBILE HEADER */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-[#E0E0E0] h-[70px] flex items-center justify-between px-6 z-[100] shadow-sm">
+        <div className="flex items-center gap-2">
+          <Logo className="w-7 h-7" color="#2E7D32" />
+          <span className="font-bold text-sm text-[#1C1C1C]">AgroSuste <span className="text-[#2E7D32]">{t('role_admin')}</span></span>
+        </div>
+        <div className="flex gap-2">
+           <button 
+             onClick={handleBackHome} 
+             className="flex items-center gap-2 px-3 py-2 bg-[#2E7D32]/5 text-[#2E7D32] rounded-xl font-bold text-[11px] transition-all active:scale-95"
+           >
+             <LayoutDashboard size={18} />
+             <span>{t('admin_back_home')}</span>
+           </button>
+           <button onClick={handleLogout} className="p-2 bg-red-50 rounded-lg text-red-600"><XCircle size={20} /></button>
+        </div>
+      </div>
+
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto hidden-scroll p-8 lg:p-12 h-full bg-[#F5F5F0]">
+      <main className="flex-1 overflow-y-auto hidden-scroll p-8 lg:p-12 h-full bg-[#F5F5F0] mt-[70px] md:mt-0">
 
         {/* HEADER TOP */}
-        <header className="flex justify-between items-center mb-10 pb-6 border-b border-[#E0E0E0]/60">
+        <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-10 pb-6 border-b border-[#E0E0E0]/60 gap-4">
           <div>
-            <h1 className="text-3xl font-poppins font-bold text-[#1C1C1C] capitalize">
-              {activeTab.replace('_', ' ')}
+            <h1 className="text-2xl md:text-3xl font-poppins font-bold text-[#1C1C1C] capitalize">
+              {t(`admin_${activeTab}` as any) || activeTab.replace('_', ' ')}
             </h1>
-            <p className="text-sm text-[#6D6D6D] mt-1">Visao geral e gestao operacional do marketplace.</p>
+            <p className="text-sm text-[#6D6D6D] mt-1">{t('admin_subtitle')}</p>
           </div>
           {isAdmin && (
-            <button onClick={() => setShowAddModal(true)} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-[0_8px_20px_rgba(46,125,50,0.2)] transition-all active:scale-95 flex items-center gap-2">
-              + Novo Registo
+            <button onClick={() => setShowAddModal(true)} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-[0_8px_20px_rgba(46,125,50,0.2)] transition-all active:scale-95 flex items-center gap-2 w-full md:w-auto justify-center">
+              {t('admin_add_new')}
             </button>
           )}
         </header>
@@ -454,28 +555,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
               <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24} /></div>
-                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Total Utilizadores</span>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">{t('admin_total_users')}</span>
                 </div>
                 <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : stats.total}</h3>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-green-50 text-green-600 rounded-xl"><Package size={24} /></div>
-                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Produtos Ativos</span>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">{t('admin_active_products')}</span>
                 </div>
                 <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : products.length}</h3>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><FileText size={24} /></div>
-                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Pedidos Realizados</span>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">{t('admin_orders_count')}</span>
                 </div>
                 <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : orders.length}</h3>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:-translate-y-1 transition-transform">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><ShieldCheck size={24} /></div>
-                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">Fornecedores Verificados</span>
+                  <span className="text-[10px] font-bold text-[#6D6D6D] uppercase">{t('admin_verified_suppliers')}</span>
                 </div>
                 <h3 className="text-3xl font-bold text-[#1C1C1C]">{loading ? '...' : stats.sellers}</h3>
               </div>
@@ -484,8 +585,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
             {/* Actividade Recente Preview */}
             <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden">
               <div className="px-8 py-6 border-b border-[#E0E0E0]/50 flex justify-between items-center">
-                <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg">Actividade Recente</h4>
-                <button className="text-sm font-semibold text-[#2E7D32] hover:underline" onClick={fetchOperationalData}>Atualizar</button>
+                <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg">{t('admin_recent_activity')}</h4>
+                <button className="text-sm font-semibold text-[#2E7D32] hover:underline" onClick={fetchOperationalData}>{t('profile_update')}</button>
               </div>
               <div className="p-8">
                 {activityLogs.slice(0, 5).map(log => (
@@ -499,7 +600,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                     </div>
                   </div>
                 ))}
-                {activityLogs.length === 0 && !loading && <span className="text-[#A0A0A0] text-sm py-4 block">Nenhuma atividade recente.</span>}
+                {activityLogs.length === 0 && !loading && <span className="text-[#A0A0A0] text-sm py-4 block">{t('admin_no_activity')}</span>}
               </div>
             </div>
           </div>
@@ -512,16 +613,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Identificacao</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Tipo/Papel</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Contato</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Status</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">Acções</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_id')}</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_role')}</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_contact')}</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_status')}</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">{t('admin_table_actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E0E0E0]/50">
                   {users
-                    .filter(u => activeTab === 'users' ? true : u.role.toLowerCase() === activeTab.slice(0, -1) || u.role.toLowerCase() === activeTab)
+                    .filter(u => {
+                      if (activeTab === 'users') return true;
+                      if (activeTab === 'suppliers') return u.role === UserRole.SELLER;
+                      if (activeTab === 'buyers') return u.role === UserRole.BUYER;
+                      if (activeTab === 'transporters') return u.role === UserRole.TRANSPORTER;
+                      return true;
+                    })
                     .map(u => (
                       <tr key={u.id} className="hover:bg-[#F9FAFB] transition-colors group">
                         <td className="py-4 px-6">
@@ -546,16 +653,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                           {u.status === 'active' ? (
                             <div className="flex items-center gap-1.5 align-middle">
                               <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-                              <span className="text-xs font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-md">Ativo</span>
+                              <span className="text-xs font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-md">{t('profile_active')}</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 align-middle">
                               <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
-                              <span className="text-xs font-bold text-[#EF4444] bg-[#EF4444]/10 px-2 py-0.5 rounded-md">Bloqueado</span>
+                              <span className="text-xs font-bold text-[#EF4444] bg-[#EF4444]/10 px-2 py-0.5 rounded-md">{t('admin_blocked')}</span>
                             </div>
                           )}
                           {!u.isApproved && (
-                            <span className="text-[10px] font-bold text-[#F59E0B] block mt-1">Pendente</span>
+                            <span className="text-[10px] font-bold text-[#F59E0B] block mt-1">{t('admin_pending')}</span>
                           )}
                         </td>
                         <td className="py-4 px-6 text-right">
@@ -573,7 +680,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                       </tr>
                     ))}
                   {users.length === 0 && !loading && (
-                    <tr><td colSpan={5} className="py-12 text-center text-[#A0A0A0] text-sm">Nenhum registo encontrado.</td></tr>
+                    <tr><td colSpan={5} className="py-12 text-center text-[#A0A0A0] text-sm">{t('admin_no_users')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -586,18 +693,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
             {filteredUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER).map(u => (
               <div key={u.id} className="bg-white p-8 rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-[#E0E0E0]/50 hover:border-[#2E7D32] transition-colors relative flex flex-col group">
-                <div className="absolute top-4 right-4"><span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-1 rounded-md">Verificado</span></div>
+                <div className="absolute top-4 right-4"><span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-1 rounded-md">{t('admin_pdf_verified')}</span></div>
                 <div className="w-16 h-16 rounded-xl border border-[#E0E0E0] flex items-center justify-center p-2 mb-4 bg-gray-50 flex-shrink-0">
                   {u.logo ? <img src={u.logo} alt={u.entityName} className="max-w-full max-h-full object-contain" /> : <ShieldCheck size={32} className="text-[#A0A0A0]" />}
                 </div>
                 <h4 className="font-poppins font-bold text-[#1C1C1C] text-lg mb-1">{u.entityName || u.fullName}</h4>
-                <p className="text-xs text-[#6D6D6D] mb-4">Parceiro Estrategico &bull; {u.location || u.district || 'Global'}</p>
+                <p className="text-xs text-[#6D6D6D] mb-4">{t('role_partner')} &bull; {u.location || u.district || 'Global'}</p>
                 <div className="mt-auto pt-4 border-t border-[#E0E0E0]/50 space-y-2">
-                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Telefone</span><span className="font-medium text-[#1C1C1C]">{u.commercialPhone}</span></div>
-                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">Email</span><span className="font-medium text-[#1C1C1C] truncate ml-2">{u.email}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">{t('admin_card_phone')}</span><span className="font-medium text-[#1C1C1C]">{u.commercialPhone}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[#A0A0A0]">{t('profile_email')}</span><span className="font-medium text-[#1C1C1C] truncate ml-2">{u.email}</span></div>
                 </div>
                 <button onClick={() => setSelectedUser(u)} className="mt-6 w-full py-2.5 rounded-xl border-2 border-[#2E5C4E] text-[#2E5C4E] font-bold text-xs hover:bg-[#2E5C4E] hover:text-white transition-colors">
-                  Gerir Parceria
+                  {t('admin_partner_manage')}
                 </button>
               </div>
             ))}
@@ -617,23 +724,196 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
               </div>
               {/* Outros filtros minguados para manter layout focado, mas mantendo a lÃ³gica de state intacta para uso futuro */}
               <div className="flex gap-4">
-                <button onClick={generatePDF} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md transition-all active:scale-95">Exportar Relatorio PDF</button>
+                <button onClick={generatePDF} className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md transition-all active:scale-95">{t('admin_pdf_btn')}</button>
               </div>
             </div>
             {/* Old legacy tables were removed but PDF keeps working since logical states exist */}
             <div className="p-12 text-center bg-white rounded-2xl border border-[#E0E0E0] shadow-sm">
               <PieChart size={48} className="mx-auto text-[#A0A0A0] mb-4 opacity-50" />
-              <h3 className="font-poppins text-xl font-bold text-[#1C1C1C] mb-2">Relatorios Detalhados</h3>
-              <p className="text-sm text-[#6D6D6D]">Exporte os relatorios PDF oficiais para analisar lucros, comissoes de parceiros e transacoes do marketplace.</p>
+              <h3 className="font-poppins text-xl font-bold text-[#1C1C1C] mb-2">{t('admin_tab_reports')}</h3>
+              <p className="text-sm text-[#6D6D6D]">{t('admin_dev_module_desc')}</p>
             </div>
           </div>
         )}
 
-        {['products', 'categories', 'orders', 'logistics', 'ratings', 'settings'].includes(activeTab) && (
+        {/* PRODUCTS TAB */}
+        {activeTab === 'products' && (
+          <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden animate-in fade-in">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_products')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_categories')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('profile_price_mzn')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('profile_active_stock')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">{t('admin_table_actions')}</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-[#E0E0E0]/50">
+                   {products.map(p => (
+                     <tr key={p.id} className="hover:bg-[#F9FAFB]">
+                       <td className="py-4 px-6">
+                         <div className="flex items-center gap-3">
+                           <img src={p.images[0]} className="w-10 h-10 rounded-lg object-cover" />
+                           <span className="font-bold text-sm text-[#1C1C1C]">{p.name}</span>
+                         </div>
+                       </td>
+                       <td className="py-4 px-6">
+                         <span className="text-xs font-semibold text-[#4B5563]">{t(categories.find((c:any) => c.id === p.categoryId)?.name || 'Geral')}</span>
+                       </td>
+                       <td className="py-4 px-6 font-bold text-sm">{p.price.toLocaleString()} MZN</td>
+                       <td className="py-4 px-6">
+                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${p.stock > 10 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                           {p.stock} {p.unit}
+                         </span>
+                       </td>
+                       <td className="py-4 px-6 text-right">
+                         <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-gray-400 hover:text-red-600 transition-colors"><XCircle size={18} /></button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+        )}
+
+        {/* CATEGORIES TAB */}
+        {activeTab === 'categories' && (
+          <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden animate-in fade-in">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">Ícone</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_categories')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('profile_status')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">{t('admin_table_actions')}</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-[#E0E0E0]/50">
+                   {categories.map((c: any) => (
+                     <tr key={c.id} className="hover:bg-[#F9FAFB]">
+                       <td className="py-4 px-6 text-2xl">{c.icon}</td>
+                       <td className="py-4 px-6 font-bold text-sm text-[#1C1C1C]">{t(c.name)}</td>
+                       <td className="py-4 px-6">
+                         <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-[10px] font-bold">Ativa</span>
+                       </td>
+                       <td className="py-4 px-6 text-right">
+                         <button className="text-gray-400 hover:text-[#2E7D32] transition-colors"><Settings size={18} /></button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+        )}
+
+        {/* ORDERS TAB */}
+        {activeTab === 'orders' && (
+          <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden animate-in fade-in">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">ID</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_date')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_table_total')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('profile_status')}</th>
+                     <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">{t('admin_table_actions')}</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-[#E0E0E0]/50">
+                   {orders.map(o => (
+                     <tr key={o.id} className="hover:bg-[#F9FAFB]">
+                       <td className="py-4 px-6 font-bold text-sm text-[#1C1C1C]">{o.id}</td>
+                       <td className="py-4 px-6 text-xs text-[#6D6D6D]">{new Date(o.createdAt).toLocaleDateString()}</td>
+                       <td className="py-4 px-6 font-bold text-sm">{o.total.toLocaleString()} MZN</td>
+                       <td className="py-4 px-6">
+                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${o.status === 'entregue' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                           {o.status}
+                         </span>
+                       </td>
+                       <td className="py-4 px-6 text-right">
+                         <button className="text-gray-400 hover:text-[#2E7D32] transition-colors"><Eye size={18} /></button>
+                       </td>
+                     </tr>
+                   ))}
+                   {orders.length === 0 && (
+                     <tr><td colSpan={5} className="py-12 text-center text-[#A0A0A0] text-sm italic">{t('admin_no_orders')}</td></tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+        )}
+
+        {/* LOGISTICS TAB */}
+        {activeTab === 'logistics' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                 <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">{t('admin_log_pickup_delivery')}</p>
+                 <h4 className="text-2xl font-bold">{deliveryRequests.length}</h4>
+               </div>
+               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                 <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">{t('admin_log_transit')}</p>
+                 <h4 className="text-2xl font-bold text-blue-600">{deliveryRequests.filter(r => r.status === DeliveryStatus.EM_ROTA).length}</h4>
+               </div>
+               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                 <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">{t('admin_log_finished')}</p>
+                 <h4 className="text-2xl font-bold text-green-600">{deliveryRequests.filter(r => r.status === DeliveryStatus.ENTREGUE).length}</h4>
+               </div>
+            </div>
+
+            <div className="bg-white rounded-[20px] shadow-[0_8px_20px_rgba(0,0,0,0.02)] border border-[#E0E0E0]/50 overflow-hidden">
+               <div className="px-8 py-6 border-b border-[#E0E0E0]/50"><h4 className="font-poppins font-bold text-[#1C1C1C]">{t('admin_log_global_routes')}</h4></div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
+                       <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_guide')}</th>
+                       <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_origin_destination')}</th>
+                       <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">{t('admin_status')}</th>
+                       <th className="py-4 px-6 text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider text-right">{t('admin_details')}</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-[#E0E0E0]/50">
+                     {deliveryRequests.map(r => (
+                       <tr key={r.id} className="hover:bg-[#F9FAFB]">
+                         <td className="py-4 px-6 font-bold text-sm">{r.id}</td>
+                         <td className="py-4 px-6">
+                           <div className="flex flex-col gap-1">
+                             <span className="text-xs text-gray-600"><span className="font-bold">📍 {t('admin_log_from')}:</span> {r.pickup_address}</span>
+                             <span className="text-xs text-gray-600"><span className="font-bold">🏁 {t('admin_log_to')}:</span> {r.delivery_address}</span>
+                           </div>
+                         </td>
+                         <td className="py-4 px-6">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                              r.status === DeliveryStatus.ENTREGUE ? 'bg-green-50 text-green-700' :
+                              r.status === DeliveryStatus.CANCELADO ? 'bg-red-50 text-red-700' :
+                              'bg-blue-50 text-blue-700'
+                            }`}>{r.status}</span>
+                         </td>
+                         <td className="py-4 px-6 text-right">
+                           <button onClick={() => setSelectedDelivery(r)} className="p-2 text-[#2E7D32] hover:bg-green-50 rounded-lg transition-colors"><Eye size={16} /></button>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {['ratings', 'settings'].includes(activeTab) && (
           <div className="min-h-[50vh] flex flex-col items-center justify-center bg-white rounded-[20px] border border-[#E0E0E0]/50 border-dashed animate-in fade-in">
             <span className="text-4xl mb-4 opacity-30 px-4 py-2 bg-gray-100 rounded-2xl filter grayscale">🚧</span>
-            <h3 className="text-lg font-bold text-[#1C1C1C]">Modulo em Desenvolvimento</h3>
-            <p className="text-sm text-[#A0A0A0] max-w-sm text-center mt-2">Esta seccao operativa faz parte da proxima fase de implantacao do AgroSuste.</p>
+            <h3 className="text-lg font-bold text-[#1C1C1C]">{t('admin_dev_module')}</h3>
+            <p className="text-sm text-[#A0A0A0] max-w-sm text-center mt-2">{t('admin_dev_module_desc')}</p>
           </div>
         )}
 
@@ -677,118 +957,225 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         <div className="fixed inset-0 bg-[#1C1C1C]/40 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="bg-white border-b border-[#E0E0E0] p-6 flex justify-between items-center">
-              <h3 className="text-lg font-poppins font-bold text-[#1C1C1C]">Novo Registo Manual</h3>
+              <h3 className="text-lg font-poppins font-bold text-[#1C1C1C]">{t('admin_manual_reg')}</h3>
               <button onClick={() => setShowAddModal(false)} className="text-[#A0A0A0] hover:text-[#1C1C1C] transition-colors p-2 rounded-lg hover:bg-gray-100">✕</button>
             </div>
-              {/* CONDITIONAL FORMS FOR PRODUCTS */}
-              {activeTab === 'products' && (
-                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+            {/* CONDITIONAL FORMS FOR PRODUCTS */}
+            {activeTab === 'products' && (
+              <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome do Produto / Colheita</label>
-                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder="Ex: Batata Reno" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Preço (MZN)</label>
-                       <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
-                     </div>
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Unidade de Medida</label>
-                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} placeholder="Ex: Kg, Saco, Ton" />
-                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Quantidade em Stock</label>
-                       <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} />
-                     </div>
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Grão Seco / Armazenável?</label>
-                       <select className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.isDried ? 'true':'false'} onChange={e => setNewProduct({...newProduct, isDried: e.target.value === 'true'})}>
-                         <option value="false">Não Fresco/Perecível</option>
-                         <option value="true">Sim, Armazenável</option>
-                       </select>
-                     </div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome do Produto</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} placeholder="Ex: Batata Reno" />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Descrição Adicional</label>
-                    <textarea rows={2} className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium resize-none transition-all" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Detalhes de Origem/Qualidade..." />
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Categoria</label>
+                    <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newProduct.categoryId} onChange={e => setNewProduct({ ...newProduct, categoryId: e.target.value })}>
+                      {categories.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.icon} {t(c.name)}</option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="pt-4 flex gap-3">
-                    <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Publicar Produto no Catálogo</button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('profile_price_mzn')}</label>
+                    <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} />
                   </div>
-                </form>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('profile_unit')}</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })} placeholder="Ex: Kg, Saco, Ton" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('profile_active_stock')}</label>
+                    <input type="number" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('admin_prod_dried')}</label>
+                    <select className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newProduct.isDried ? 'true' : 'false'} onChange={e => setNewProduct({ ...newProduct, isDried: e.target.value === 'true' })}>
+                      <option value="false">{t('admin_prod_dried_no')}</option>
+                      <option value="true">{t('admin_prod_dried_yes')}</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-2 block">{t('admin_prod_upload_img')}</label>
+                  <div className="flex gap-4 items-center mb-4">
+                    <div className="w-20 h-20 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center overflow-hidden">
+                      {newProduct.image ? <img src={newProduct.image} className="w-full h-full object-cover" /> : <Package size={24} className="text-gray-300" />}
+                    </div>
+                    <div className="flex-1">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => setNewProduct({ ...newProduct, image: reader.result as string });
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-[#E8F5E9] file:text-[#2E7D32] hover:file:bg-[#C8E6C9] cursor-pointer" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">{t('admin_prod_publish_btn')}</button>
+                </div>
+              </form>
+            )}
+
+            {/* CONDITIONAL FORM FOR CATEGORIES */}
+            {activeTab === 'categories' && (
+              <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('admin_cat_name')}</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] outline-none text-sm font-medium" value={newCategory.name} onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} placeholder="Ex: Hortícolas Frescos" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">{t('admin_cat_icon')}</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] outline-none text-sm font-medium" value={newCategory.icon} onChange={e => setNewCategory({ ...newCategory, icon: e.target.value })} placeholder="Ex: 🍎, 🥦, 🌾" />
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <button type="submit" className="flex-1 bg-[#2E7D32] text-white py-3.5 rounded-xl font-bold text-sm">Criar Categoria</button>
+                </div>
+              </form>
+            )}
+
+            {/* CONDITIONAL FORMS FOR STRATEGIC PARTNERS */}
+            {activeTab === 'partners' && (
+              <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome da Instituição/Organização</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newPartner.entityName} onChange={e => setNewPartner({ ...newPartner, entityName: e.target.value })} placeholder="Agência de Cooperação Internacional" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email Corporativo</label>
+                    <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.email} onChange={e => setNewPartner({ ...newPartner, email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Contacto Oficial</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.phone} onChange={e => setNewPartner({ ...newPartner, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Sede/Localização Geográfica</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newPartner.location} onChange={e => setNewPartner({ ...newPartner, location: e.target.value })} placeholder="Província/Distrito de Operação" />
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(37,99,235,0.2)] transition-all">{t('admin_partner_reg_btn')}</button>
+                </div>
+              </form>
+            )}
+
+            {/* DEFAULT FOR USERS (BUYERS, SELLERS, TRANSPORTERS) */}
+            {(activeTab === 'users' || activeTab === 'suppliers' || activeTab === 'buyers' || activeTab === 'transporters' || activeTab === 'dashboard') && (
+              <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome Completo</label>
+                  <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email</label>
+                    <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Telefone Primário</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Província</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.province} onChange={e => setNewUser({ ...newUser, province: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Distrito</label>
+                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.district} onChange={e => setNewUser({ ...newUser, district: e.target.value })} />
+                  </div>
+                </div>
+                {activeTab === 'users' && (
+                  <div>
+                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Tipo de Perfil Específico</label>
+                    <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
+                      <option value={UserRole.SELLER}>Fornecedor/Vendedor</option>
+                      <option value={UserRole.BUYER}>Comprador</option>
+                      <option value={UserRole.TRANSPORTER}>Transportador</option>
+                    </select>
+                  </div>
+                )}
+                <div className="pt-4 flex gap-3">
+                  <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">{t('admin_user_add_btn')}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELIVERY DETAILS */}
+      {selectedDelivery && (
+        <div className="fixed inset-0 bg-[#1C1C1C]/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="bg-[#2E7D32] p-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-poppins font-bold">Guia de Transporte: {selectedDelivery.id}</h3>
+                <p className="text-xs opacity-80">Criado em {new Date(selectedDelivery.created_at).toLocaleString()}</p>
+              </div>
+              <button onClick={() => setSelectedDelivery(null)} className="p-2 hover:bg-white/10 rounded-lg">✕</button>
+            </div>
+            <div className="p-8 space-y-8">
+              <DeliveryStatusTimeline status={selectedDelivery.status} />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                <div className="space-y-4">
+                  <h5 className="text-[10px] font-bold text-[#A0A0A0] uppercase border-b pb-2">Origem (Recolha)</h5>
+                  <div className="space-y-2">
+                    <p className="font-bold flex items-center gap-2"><MapPin size={14} className="text-red-500" /> {selectedDelivery.pickup_address}</p>
+                    <p className="text-xs text-[#6D6D6D]">{selectedDelivery.pickup_name} &bull; {selectedDelivery.pickup_phone}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h5 className="text-[10px] font-bold text-[#A0A0A0] uppercase border-b pb-2">Destino (Entrega)</h5>
+                  <div className="space-y-2">
+                    <p className="font-bold flex items-center gap-2"><MapPin size={14} className="text-green-500" /> {selectedDelivery.delivery_address}</p>
+                    <p className="text-xs text-[#6D6D6D]">{selectedDelivery.delivery_name} &bull; {selectedDelivery.delivery_phone}</p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedDelivery.notes && (
+                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 flex gap-3">
+                  <Info size={16} className="text-yellow-700 shrink-0" />
+                  <p className="text-xs text-yellow-800">{selectedDelivery.notes}</p>
+                </div>
               )}
 
-              {/* CONDITIONAL FORMS FOR STRATEGIC PARTNERS */}
-              {activeTab === 'partners' && (
-                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
-                   <div>
-                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome da Instituição/Organização</label>
-                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newPartner.entityName} onChange={e => setNewPartner({...newPartner, entityName: e.target.value})} placeholder="Agência de Cooperação Internacional" />
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email Corporativo</label>
-                       <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.email} onChange={e => setNewPartner({...newPartner, email: e.target.value})} />
-                     </div>
-                     <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Contacto Oficial</label>
-                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium" value={newPartner.phone} onChange={e => setNewPartner({...newPartner, phone: e.target.value})} />
-                     </div>
-                   </div>
-                   <div>
-                     <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Sede/Localização Geográfica</label>
-                     <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newPartner.location} onChange={e => setNewPartner({...newPartner, location: e.target.value})} placeholder="Província/Distrito de Operação" />
-                   </div>
-                   <div className="pt-4 flex gap-3">
-                     <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(37,99,235,0.2)] transition-all">Registar Parceiro Institucional</button>
-                   </div>
-                </form>
-              )}
-
-              {/* DEFAULT FOR USERS (BUYERS, SELLERS, TRANSPORTERS) */}
-              {(activeTab === 'users' || activeTab === 'suppliers' || activeTab === 'buyers' || activeTab === 'transporters' || activeTab === 'dashboard') && (
-                <form onSubmit={handleAddNewEntity} className="p-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Nome Completo</label>
-                    <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Email</label>
-                      <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Telefone Primário</label>
-                      <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Província</label>
-                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.province} onChange={e => setNewUser({ ...newUser, province: e.target.value })} />
-                    </div>
-                    <div>
-                       <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Distrito</label>
-                       <input required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] outline-none text-sm font-medium transition-all" value={newUser.district} onChange={e => setNewUser({ ...newUser, district: e.target.value })} />
-                    </div>
-                  </div>
-                  {activeTab === 'users' && (
-                    <div>
-                      <label className="text-xs font-bold text-[#6D6D6D] ml-1 mb-1 block">Tipo de Perfil Específico</label>
-                      <select required className="w-full px-4 py-3 rounded-xl bg-white border border-[#E0E0E0] focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 outline-none text-sm font-medium transition-all" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as any })}>
-                        <option value={UserRole.SELLER}>Fornecedor/Vendedor</option>
-                        <option value={UserRole.BUYER}>Comprador</option>
-                        <option value={UserRole.TRANSPORTER}>Transportador</option>
-                      </select>
-                    </div>
-                  )}
-                  <div className="pt-4 flex gap-3">
-                    <button type="submit" className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(46,125,50,0.2)] transition-all">Concluir Adição de Perfil Oficial</button>
-                  </div>
-                </form>
-              )}
+              <div className="pt-6 border-t border-gray-100 flex gap-3">
+                <button 
+                  onClick={() => {
+                    if(window.confirm(t('admin_cancel_delivery') + '?')) {
+                      mockDb.updateDeliveryStatus(selectedDelivery.id, DeliveryStatus.CANCELADO);
+                      setSelectedDelivery(null);
+                      fetchOperationalData();
+                    }
+                  }}
+                  className="flex-1 py-3 text-sm font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"
+                >
+                  {t('admin_cancel_delivery')}
+                </button>
+                <button onClick={() => setSelectedDelivery(null)} className="flex-1 py-3 bg-[#2E7D32] text-white text-sm font-bold rounded-xl shadow-md">
+                  {t('profile_close')}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

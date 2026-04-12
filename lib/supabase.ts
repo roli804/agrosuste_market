@@ -25,3 +25,19 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
 if (!supabase) {
   console.error('[SUPABASE ERROR] Supabase não inicializado. Verifique as chaves no ficheiro .env');
 }
+
+// Global flag para silenciar erros de tabelas que sabemos estarem em falta (com persistência no localStorage)
+const PROFILES_MISSING_KEY = 'agrosuste_profiles_missing';
+
+export const supabaseTableStates = {
+  get profilesMissing(): boolean {
+    return localStorage.getItem(PROFILES_MISSING_KEY) === 'true';
+  },
+  set profilesMissing(value: boolean) {
+    if (value) {
+      localStorage.setItem(PROFILES_MISSING_KEY, 'true');
+    } else {
+      localStorage.removeItem(PROFILES_MISSING_KEY);
+    }
+  }
+};

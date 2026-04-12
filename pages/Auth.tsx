@@ -117,6 +117,12 @@ const Auth: React.FC = () => {
   const [estatuto, setEstatuto] = useState('');
   const [boletim, setBoletim] = useState('');
 
+  // DOCUMENT FILES (Base64 for mock/preview)
+  const [nuitFile, setNuitFile] = useState<string | null>(null);
+  const [alvaraFile, setAlvaraFile] = useState<string | null>(null);
+  const [estatutoFile, setEstatutoFile] = useState<string | null>(null);
+  const [boletimFile, setBoletimFile] = useState<string | null>(null);
+
   // Campos para Parceiros/ONGs
   const [partnerLogo, setPartnerLogo] = useState('');
   const [partnerLocation, setPartnerLocation] = useState('');
@@ -147,8 +153,13 @@ const Auth: React.FC = () => {
   };
 
   useEffect(() => {
+    resetForm();
     if (mode === 'signup') getCountryPhoneInfo(country).then(setPhoneMeta);
-  }, [country, mode]);
+  }, [mode]);
+
+  useEffect(() => {
+     if (mode === 'signup') getCountryPhoneInfo(country).then(setPhoneMeta);
+  }, [country]);
 
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -192,6 +203,13 @@ const Auth: React.FC = () => {
           throw new Error("Posto Administrativo e Localidade são obrigatórios para a estrutura nacional.");
         }
 
+        // Validação de Documentos Obrigatórios para Empresas/Cooperativas
+        if (entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) {
+          if (!nuit || !alvara) {
+            throw new Error("O NUIT e o Alvará são obrigatórios para o registo de Empresas ou Cooperativas.");
+          }
+        }
+
         // --- REGRA DE OURO: ADMIN WHITELIST ---
         const isAdminEmail = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(email.toLowerCase());
         const finalRole = isAdminEmail ? UserRole.ADMIN : role;
@@ -225,7 +243,11 @@ const Auth: React.FC = () => {
                 nuit,
                 alvara,
                 estatuto,
-                boletim
+                boletim,
+                nuit_file: nuitFile,
+                alvara_file: alvaraFile,
+                estatuto_file: estatutoFile,
+                boletim_file: boletimFile
               } : undefined,
               logo: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLogo : undefined,
               location: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLocation : undefined
@@ -606,13 +628,105 @@ const Auth: React.FC = () => {
                   )}
 
                   {(entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) && (
-                    <div className="bg-[#FAFAFA] p-6 rounded-[12px] border border-gray-100 space-y-5 md:col-span-2">
-                       <h4 className="text-[13px] font-semibold text-[#1C1C1C] flex items-center gap-2">📑 {t('auth_business_docs')}</h4>
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={nuit} onChange={e => setNuit(e.target.value)} /><label className="auth-floating-label">{t('auth_nuit')}</label></div>
-                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={alvara} onChange={e => setAlvara(e.target.value)} /><label className="auth-floating-label">{t('auth_alvara')}</label></div>
-                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={estatuto} onChange={e => setEstatuto(e.target.value)} /><label className="auth-floating-label">{t('auth_estatuto')}</label></div>
-                          <div className="relative"><input className="auth-input peer !bg-white" placeholder=" " value={boletim} onChange={e => setBoletim(e.target.value)} /><label className="auth-floating-label">{t('auth_boletim')}</label></div>
+                    <div className="bg-[#FAFAFA] p-6 rounded-[12px] border border-gray-100 space-y-6 md:col-span-2">
+                       <h4 className="text-[13px] font-semibold text-[#1C1C1C] flex items-center gap-2">📑 {t('auth_business_docs')} <span className="text-[10px] font-normal text-gray-400 font-inter">(Uploads recomendados)</span></h4>
+                       
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* NUIT */}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-[#6D6D6D] uppercase flex justify-between">
+                              {t('auth_nuit')} <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input className="auth-input peer !bg-white" placeholder=" " value={nuit} onChange={e => setNuit(e.target.value)} />
+                                <label className="auth-floating-label">Número</label>
+                              </div>
+                              <label className={`w-12 h-[48px] rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-all ${nuitFile ? 'bg-green-50 border-[#2E7D32] text-[#2E7D32]' : 'bg-white border-gray-200 text-gray-400 hober:border-gray-300'}`}>
+                                <Upload size={18} />
+                                <input type="file" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setNuitFile(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* ALVARÁ */}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-[#6D6D6D] uppercase flex justify-between">
+                              {t('auth_alvara')} <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input className="auth-input peer !bg-white" placeholder=" " value={alvara} onChange={e => setAlvara(e.target.value)} />
+                                <label className="auth-floating-label">Número</label>
+                              </div>
+                              <label className={`w-12 h-[48px] rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-all ${alvaraFile ? 'bg-green-50 border-[#2E7D32] text-[#2E7D32]' : 'bg-white border-gray-200 text-gray-400 hober:border-gray-300'}`}>
+                                <Upload size={18} />
+                                <input type="file" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setAlvaraFile(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* ESTATUTO */}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-[#6D6D6D] uppercase flex justify-between">
+                              {t('auth_estatuto')} <span className="text-gray-400 font-normal normal-case">(Opcional)</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input className="auth-input peer !bg-white" placeholder=" " value={estatuto} onChange={e => setEstatuto(e.target.value)} />
+                                <label className="auth-floating-label">Referência</label>
+                              </div>
+                              <label className={`w-12 h-[48px] rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-all ${estatutoFile ? 'bg-green-50 border-[#2E7D32] text-[#2E7D32]' : 'bg-white border-gray-200 text-gray-400 hober:border-gray-300'}`}>
+                                <Upload size={18} />
+                                <input type="file" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setEstatutoFile(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* BOLETIM */}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-[#6D6D6D] uppercase flex justify-between">
+                              {t('auth_boletim')} <span className="text-gray-400 font-normal normal-case">(Opcional)</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input className="auth-input peer !bg-white" placeholder=" " value={boletim} onChange={e => setBoletim(e.target.value)} />
+                                <label className="auth-floating-label">Referência</label>
+                              </div>
+                              <label className={`w-12 h-[48px] rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-all ${boletimFile ? 'bg-green-50 border-[#2E7D32] text-[#2E7D32]' : 'bg-white border-gray-200 text-gray-400 hober:border-gray-300'}`}>
+                                <Upload size={18} />
+                                <input type="file" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setBoletimFile(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          </div>
                        </div>
                     </div>
                   )}

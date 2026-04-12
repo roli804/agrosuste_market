@@ -37,7 +37,7 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
         setTranslatedProducts(resetProducts);
 
         const resetCats: Record<string, string> = {};
-        CATEGORIES.forEach(c => resetCats[c.id] = c.name);
+        CATEGORIES.forEach(c => resetCats[c.id] = t(c.name));
         setTranslatedCategories(resetCats);
         return;
       }
@@ -54,7 +54,7 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
       });
 
       // Batch translate categories
-      const catTexts = CATEGORIES.map(c => c.name);
+      const catTexts = CATEGORIES.map(c => t(c.name));
 
       const [translatedProductTexts, translatedCatTexts] = await Promise.all([
         translateBatch(productTexts),
@@ -92,15 +92,15 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
           <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-6">
             <Logo className="w-10 h-10 text-[#2E7D32] hidden sm:block" color="#2E7D32" />
             <h1 className="font-poppins text-2xl sm:text-4xl md:text-6xl font-bold text-[#263238] tracking-tight max-w-4xl leading-[1.15]">
-              Conectando o Campo Aos <br className="hidden md:block" /> <span className="text-[#2E7D32]">Mercados Globais</span>
+              {t('home_hero_title_part1')} <br className="hidden md:block" /> <span className="text-[#2E7D32]">{t('home_hero_title_part2')}</span>
             </h1>
           </div>
           <p className="font-inter text-xs sm:text-[15px] md:text-[18px] max-w-2xl mb-8 md:mb-10 text-[#263238] font-medium leading-relaxed px-4 sm:px-0">
-            A ponte direta entre produtores sustentáveis locais e investidores internacionais buscando qualidade premium e impacto verde real.
+            {t('home_hero_subtitle')}
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link to="/shop" className="bg-[#2E7D32] text-white px-6 md:px-10 py-3 md:py-4 rounded-xl md:rounded-2xl font-poppins font-bold text-sm md:text-md shadow-xl hover:bg-[#1B5E20] transition-all flex items-center gap-2">
-              Explorar Marketplace <ArrowRight size={20} />
+              {t('home_hero_cta')} <ArrowRight size={20} />
             </Link>
           </div>
         </div>
@@ -125,7 +125,7 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
               <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-3xl mb-4 group-hover:bg-green-50 transition-all">
                 {cat.icon}
               </div>
-              <span className="font-bold text-xs text-gray-500">{translatedCategories[cat.id] || cat.name}</span>
+              <span className="font-bold text-xs text-gray-500">{translatedCategories[cat.id] || t(cat.name)}</span>
             </Link>
           ))}
         </div>
@@ -158,14 +158,14 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
                       {product.price.toLocaleString()} <span className="text-[12px] font-medium text-[#757575]">MZN</span>
                     </span>
                     {product.stock > 0 ? (
-                      <span className="font-inter text-[#4CAF50] text-[12px] font-medium">Em stock</span>
+                      <span className="font-inter text-[#4CAF50] text-[12px] font-medium">{t('stock_available')}</span>
                     ) : (
-                      <span className="font-inter text-[#E53935] text-[12px] font-medium">Indisponível</span>
+                      <span className="font-inter text-[#E53935] text-[12px] font-medium">{t('stock_none')}</span>
                     )}
                   </div>
 
-                  <button onClick={() => addToCart(product)} className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-[10px] rounded-[8px] font-inter font-medium text-[14px] transition-colors flex justify-center items-center">
-                    adicionar ao carrinho
+                  <button onClick={() => addToCart(product)} className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white py-[10px] rounded-[8px] font-inter font-medium text-[14px] transition-colors flex justify-center items-center uppercase">
+                    {t('add_to_cart')}
                   </button>
                 </div>
               </div>
@@ -226,14 +226,14 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
             </div>
           ) : (
             <div className="h-40 flex items-center justify-center text-gray-400 font-medium italic">
-              Conectando novos parceiros à rede global...
+              {t('home_partners_loading')}
             </div>
           )}
 
           {/* CTA Partner */}
           <div className="mt-12 flex justify-center">
             <Link to="/auth?role=strategic_partner" className="premium-btn text-sm flex items-center gap-2 shadow-xl hover:shadow-2xl">
-              Tornar-me Parceiro Estratégico AgroSuste <ArrowRight size={16} />
+              {t('home_be_partner')} <ArrowRight size={16} />
             </Link>
           </div>
         </div>

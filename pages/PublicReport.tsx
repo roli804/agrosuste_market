@@ -4,7 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { MOZ_GEOGRAPHY } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseTableStates } from '../lib/supabase';
 import { mockDb } from '../lib/mock_db';
 import { Download, Search, Filter, Eye, List, FileText, ChevronRight } from 'lucide-react';
 
@@ -25,10 +25,28 @@ const PublicReport: React.FC = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        let allUsers: User[] = [];
-        const { data: profilesData } = await supabase.from('profiles').select('id, role, province, country, status');
-        if (profilesData) {
-            allUsers = profilesData as any[];
+        if (supabaseTableStates.profilesMissing) {
+            setUsers(mockDb.getUsers());
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const { data: profilesData, error } = await supabase.from('profiles').select('id, role, province, country, status');
+            if (error) {
+                if (error.code === 'PGRST205') supabaseTableStates.profilesMissing = true;
+                throw error;
+            }
+            if (profilesData) {
+                allUsers = profilesData as any[];
+            }
+        } catch (e: any) {
+            if (e?.code === 'PGRST205' || e?.message?.includes('profiles')) {
+                supabaseTableStates.profilesMissing = true;
+                console.log("[AgroSuste] PublicReport: Tabela 'profiles' não encontrada. Usando Mocks.");
+            } else {
+                console.error("Erro ao procurar perfis no Supabase (PublicReport):", e);
+            }
         }
 
         const localUsers = mockDb.getUsers();

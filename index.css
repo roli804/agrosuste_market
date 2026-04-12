@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "system-ui", "-apple-system", "sans-serif";
+  --font-display: "Poppins", "system-ui", "-apple-system", "sans-serif";
+  --font-poppins: "Poppins", "sans-serif";
+  --font-inter: "Inter", "sans-serif";
+
+  --color-brand: #2E7D32;
+  --color-brand-light: #4CAF50;
+  --color-brand-soft: #A5D6A7;
+  --color-accent: #D4A373;
+  --color-earth: #8D6E63;
+  --color-earth-light: #F5F5DC;
+  --color-earth-sand: #EFEFE8;
+  --color-neutral-light: #E0E0E0;
+  --color-neutral-medium: #757575;
+  --color-neutral-dark: #263238;
+}
+
+/* Custom Base Styles */
+:root {
+    --primary-verde-folha: #2E7D32;
+    --primary-verde-broto: #4CAF50;
+    --bg-light: #F5F5DC;
+    --bg-card: #FFFFFF;
+    --text-main: #263238;
+    --border-light: #E0E0E0;
+}
+
+body {
+    @apply font-sans antialiased bg-[#F5F5DC] text-[#263238] m-0 p-0 overflow-x-hidden;
+}
+
+h1, h2, h3, h4, h5, h6 { 
+    @apply font-display text-[#263238];
+}
+
+/* Shadow-left premium effect */
+.shadow-left-premium {
+    box-shadow: -10px 0px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Scrollbar hiding utilities */
+.hidden-scroll::-webkit-scrollbar { width: 0; background: transparent; }
+
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee 40s linear infinite;
+}
+.animate-marquee:hover {
+    animation-play-state: paused;
+}
+
+/* --- PREMIUM SAAS DESIGN SYSTEM --- */
+.premium-card {
+    @apply bg-white rounded-2xl p-6 border border-[#F0F0F0] shadow-[0_10px_30px_rgba(0,0,0,0.04)];
+}
+
+.premium-btn {
+    @apply bg-[#1B5E20] text-white rounded-xl px-6 py-3 font-bold transition-all shadow-[0_4px_14px_rgba(27,94,32,0.2)] hover:bg-[#0D3B12] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(27,94,32,0.3)] active:scale-95;
+    outline: none;
+    cursor: pointer;
+}
+
+.premium-input {
+    @apply w-full h-12 rounded-xl bg-[#FAFAFA] border border-transparent px-4 text-sm font-semibold text-[#1C1C1C] transition-all outline-none focus:border-[#2E7D32] focus:bg-white focus:shadow-[0_0_0_3px_rgba(46,125,50,0.08)];
+}
+
+.premium-table th {
+    @apply text-left p-4 text-[11px] font-bold text-[#6D6D6D] uppercase tracking-wider bg-[#FAFAFA] border-b-2 border-[#E0E0E0];
+}
+.premium-table td {
+    @apply p-4 border-b border-[#F0F0F0] transition-colors;
+}
+.premium-table tbody tr:hover td {
+    @apply bg-[#F8FBF8];
+}
+
+/* Floating Label CSS Strategy */
+.premium-floating-label { @apply relative; }
+.premium-floating-label label {
+    @apply absolute left-3 -top-2 bg-white px-1 text-[10px] font-bold text-[#A0A0A0] transition-all pointer-events-none;
+}
+
+/* Marketplace & Product Card Refinement */
+.shop-card {
+    @apply bg-white border border-[#E0E0E0] rounded-xl overflow-hidden transition-all duration-500 flex flex-col h-full hover:-translate-y-2 hover:shadow-[0_12px_24px_rgba(0,0,0,0.08)] hover:border-[#2E7D32];
+}
+.shop-card-img-wrapper {
+    @apply relative w-full h-[180px] overflow-hidden;
+}
+.shop-card-img {
+    @apply w-full h-full object-cover transition-transform duration-700;
+}
+.shop-card:hover .shop-card-img {
+    @apply scale-110;
+}
+
+.sidebar-link {
+    @apply w-full text-left px-5 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3;
+}
+.sidebar-link.active {
+    @apply bg-[#2E7D32] text-white shadow-[0_4px_12px_rgba(46,125,50,0.2)];
+}
+.sidebar-link:not(.active) {
+    @apply text-[#6D6D6D] hover:bg-[#F5F5F0] hover:text-[#1C1C1C];
+}
+
+/* Enforce elegant fonts on theme-premium */
+.theme-premium {
+    @apply font-sans text-[#1C1C1C];
+}

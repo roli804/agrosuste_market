@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, CartItem, PaymentMethod, Order, OrderStatus } from '../types';
-import { PLATFORM_COMMISSION_RATE } from '../constants';
+import { User, CartItem, PaymentMethod, Order, OrderStatus, DeliveryStatus, DeliveryRequest, UserRole } from '../types';
+import { PLATFORM_COMMISSION_RATE, MOCK_USERS } from '../constants';
 import { Link } from 'react-router-dom';
 import { PaysGatorService } from '../lib/paysgator';
 import { useLanguage } from '../LanguageContext';
+import MapLocationPicker from '../components/MapLocationPicker';
+import { mockDb } from '../lib/mock_db';
 
 interface CheckoutProps {
   cart: CartItem[];
@@ -24,6 +26,8 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
   const [cardCvv, setCardCvv] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [needsDelivery, setNeedsDelivery] = useState(false);
+  const [deliveryLocation, setDeliveryLocation] = useState<{lat?: number, lng?: number, address: string}>({ address: '' });
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const commission = total * PLATFORM_COMMISSION_RATE;
@@ -82,10 +86,21 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
     }
   };
 
+  const handleSimulatePayment = () => {
+    setErrorMessage('');
+    setStep('waiting_pin');
+    setElapsedTime(0);
+    // Simula um delay de rede antes do sucesso
+    setTimeout(() => {
+      // O utilizador pode entao clicar no botao de simular PIN que ja existe
+    }, 500);
+  };
+
   const handleSimulatePinSuccess = () => {
+    const orderId = `ORD-${Date.now()}`;
     // Generate order and save to local storage
     const newOrder: Order = {
-      id: `ORD-${Date.now()}`,
+      id: orderId,
       buyerId: user?.id,
       buyerName: user?.fullName || 'Visitante',
       buyerPhone: user?.phone || '',
@@ -104,6 +119,30 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
     const existingOrders: Order[] = existingOrdersJson ? JSON.parse(existingOrdersJson) : [];
     existingOrders.push(newOrder);
     localStorage.setItem('agro_suste_orders', JSON.stringify(existingOrders));
+
+    // CREATE DELIVERY REQUEST IF NEEDED
+    if (needsDelivery) {
+      // Find producer info from first item
+      const producerId = cart[0].producerId;
+      const producer = mockDb.getUsers().find(u => u.id === producerId) || MOCK_USERS.find(u => u.id === producerId);
+      
+      const deliveryRequest: DeliveryRequest = {
+        id: `DEL-${Date.now()}`,
+        order_id: orderId,
+        created_by: user?.id || 'visitor',
+        pickup_name: producer?.fullName || 'Fornecedor',
+        pickup_phone: producer?.phone || '',
+        pickup_address: producer?.location || producer?.district || 'Armazém do Fornecedor',
+        delivery_name: user?.fullName || 'Cliente',
+        delivery_phone: phoneNumber || user?.phone || '',
+        delivery_address: deliveryLocation.address,
+        delivery_lat: deliveryLocation.lat,
+        delivery_lng: deliveryLocation.lng,
+        status: DeliveryStatus.PENDENTE,
+        created_at: new Date().toISOString()
+      };
+      mockDb.saveDeliveryRequest(deliveryRequest);
+    }
 
     setStep('success');
     onComplete(subtotal);
@@ -145,6 +184,31 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
                 </div>
               ))}
             </div>
+            <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚚</span>
+                  <div>
+                    <p className="font-bold text-sm">Necessita de entrega?</p>
+                    <p className="text-[10px] text-gray-400">Entrega rápida via transportador parceiro</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={needsDelivery} onChange={(e) => setNeedsDelivery(e.target.checked)} />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2E7D32]"></div>
+                </label>
+              </div>
+
+              {needsDelivery && (
+                <div className="pt-4 border-t border-gray-100 animate-in fade-in slide-in-from-top-2">
+                  <MapLocationPicker 
+                    label="Endereço de Entrega" 
+                    onLocationSelect={(lat, lng, addr) => setDeliveryLocation({ lat, lng, address: addr })} 
+                  />
+                </div>
+              )}
+            </div>
+
             <button onClick={() => setStep('payment')} className="premium-btn w-full py-6 md:py-8 text-[12px] md:text-sm">{t('checkout_choose_payment')}</button>
           </div>
         </div>
@@ -260,6 +324,13 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
               {(method === PaymentMethod.BANK_LOCAL ? (cardNumber && cardExpiry && cardCvv) : (phoneNumber && phoneNumber.length === 9)) 
                   ? `${t('checkout_pay_now')} ${total.toLocaleString()} MZN` 
                   : t('checkout_fill_data')}
+            </button>
+
+            <button 
+              onClick={handleSimulatePayment}
+              className="w-full mt-4 py-3 border-2 border-dashed border-[#2E7D32]/30 text-[#2E7D32] rounded-2xl font-bold text-[10px] hover:bg-green-50 transition-all uppercase tracking-widest"
+            >
+              🛠️ Simular Pagamento (Apenas Teste)
             </button>
           </div>
         </div>

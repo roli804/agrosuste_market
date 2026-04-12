@@ -24,7 +24,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
         setTranslatedProducts(resetProducts);
         
         const resetCats: Record<string, string> = {};
-        CATEGORIES.forEach(c => resetCats[c.id] = c.name);
+        CATEGORIES.forEach(c => resetCats[c.id] = t(c.name));
         setTranslatedCategories(resetCats);
         return;
       }
@@ -41,7 +41,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
       });
 
       // Batch translate categories
-      const catTexts = CATEGORIES.map(c => c.name);
+      const catTexts = CATEGORIES.map(c => t(c.name));
 
       const [translatedProductTexts, translatedCatTexts] = await Promise.all([
         translateBatch(productTexts),
@@ -95,7 +95,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-widest mb-6">Categorias de Produção</h3>
+              <h3 className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-widest mb-6">{t('shop_categories')}</h3>
               <div className="space-y-2">
                 <button 
                   onClick={() => setSelectedCategory(null)}
@@ -109,7 +109,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
                     onClick={() => setSelectedCategory(cat.id)}
                     className={`sidebar-link ${selectedCategory === cat.id ? 'active' : ''}`}
                   >
-                    <span className="text-lg">{cat.icon}</span> {translatedCategories[cat.id] || cat.name}
+                    <span className="text-lg">{cat.icon}</span> {translatedCategories[cat.id] || t(cat.name)}
                   </button>
                 ))}
               </div>
@@ -117,9 +117,9 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
             
             <div className="hidden lg:block bg-gradient-to-br from-[#2E7D32] to-[#1B5E20] p-8 rounded-3xl text-white shadow-xl overflow-hidden relative group">
                <div className="relative z-10">
-                  <h4 className="font-poppins font-bold text-lg mb-2">Qualidade AgroSuste</h4>
-                  <p className="text-xs text-green-100/80 leading-relaxed mb-6">Todos os produtos nesta montra são verificados pela nossa equipa técnica.</p>
-                  <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-white/20 backdrop-blur-sm">Saber Mais</button>
+                  <h4 className="font-poppins font-bold text-lg mb-2">{t('info_official_title')}</h4>
+                  <p className="text-xs text-green-100/80 leading-relaxed mb-6">{t('info_official_desc')}</p>
+                  <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-white/20 backdrop-blur-sm">{t('admin_table_view')}</button>
                </div>
                <div className="absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:rotate-12 transition-transform duration-700">🌱</div>
             </div>
@@ -131,10 +131,10 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
           <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12 px-2">
             <div>
               <h2 className="text-4xl md:text-5xl font-poppins font-bold text-[#1C1C1C] tracking-tight">
-                {selectedCategory ? (translatedCategories[selectedCategory] || CATEGORIES.find(c => c.id === selectedCategory)?.name) : t('shop_market_title')}
+                {selectedCategory ? (translatedCategories[selectedCategory] || t(CATEGORIES.find(c => c.id === selectedCategory)?.name || '')) : t('shop_market_title')}
               </h2>
               <div className="flex items-center gap-2 mt-4">
-                <span className="px-3 py-1 bg-[#2E7D32]/10 text-[#2E7D32] rounded-full text-[10px] font-bold uppercase tracking-wider">Marketplace Oficial</span>
+                <span className="px-3 py-1 bg-[#2E7D32]/10 text-[#2E7D32] rounded-full text-[10px] font-bold uppercase tracking-wider">{t('profile_official')}</span>
                 <span className="text-[#A0A0A0] text-sm font-medium border-l border-gray-200 pl-3">
                   {t('shop_showing')} {filteredProducts.length} {t('shop_harvests')}
                 </span>
@@ -189,7 +189,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
                           </div>
                           <div className="text-right">
                              <div className={`text-[9px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${product.stock > 0 ? 'bg-green-50 text-[#2E7D32]' : 'bg-red-50 text-red-600'}`}>
-                               {product.stock > 0 ? `${product.stock} em stock` : 'Sem Stock'}
+                               {product.stock > 0 ? `${product.stock} ${t('stock_available')}` : t('admin_no_records')}
                              </div>
                           </div>
                         </div>
@@ -218,7 +218,7 @@ const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
                 onClick={() => {setSearchQuery(''); setSelectedCategory(null);}}
                 className="mt-8 text-[#2E7D32] font-bold text-sm underline hover:no-underline"
               >
-                Limpar todos os filtros
+                {t('checkout_remove')}
               </button>
             </div>
           )}

@@ -138,6 +138,34 @@ export interface Order {
   createdAt: string;
 }
 
+export enum DeliveryStatus {
+  PENDENTE = 'PENDENTE',
+  ACEITE = 'ACEITE',
+  EM_ROTA = 'EM_ROTA',
+  ENTREGUE = 'ENTREGUE',
+  CANCELADO = 'CANCELADO'
+}
+
+export interface DeliveryRequest {
+  id: string;
+  order_id?: string;
+  created_by: string;
+  pickup_name: string;
+  pickup_phone: string;
+  pickup_address: string;
+  pickup_lat?: number;
+  pickup_lng?: number;
+  delivery_name: string;
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_lat?: number;
+  delivery_lng?: number;
+  status: DeliveryStatus;
+  assigned_driver_id?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export enum LogType {
   LOGIN = 'LOGIN',
   SIGNUP = 'SIGNUP',

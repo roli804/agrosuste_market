@@ -28,19 +28,22 @@ export const WORLD_LANGUAGES = [
 ];
 
 export const CATEGORIES: Category[] = [
-  { id: '1', name: 'Cereais', icon: '🌾', is_active: true },
-  { id: '2', name: 'Leguminosas', icon: '🫘', is_active: true },
-  { id: '3', name: 'Hortícolas', icon: '🥬', is_active: true },
-  { id: '4', name: 'Frutas', icon: '🍎', is_active: true },
-  { id: '5', name: 'Raízes', icon: '🥔', is_active: true },
-  { id: '6', name: 'Insumos', icon: '🚜', is_active: true },
+  { id: '1', name: 'cat_cereals', icon: '🌾', is_active: true },
+  { id: '2', name: 'cat_legumes', icon: '🫘', is_active: true },
+  { id: '3', name: 'cat_veg', icon: '🥬', is_active: true },
+  { id: '4', name: 'cat_fruit', icon: '🍎', is_active: true },
+  { id: '5', name: 'cat_roots', icon: '🥔', is_active: true },
+  { id: '6', name: 'cat_inputs', icon: '🚜', is_active: true },
 ];
 
 // Added missing status, commercialPhone, and linkedAccounts properties to each mock user to satisfy User interface requirements
 export const MOCK_USERS: User[] = [
   { id: 'u1', email: 'jaimecebola001@gmail.com', fullName: 'Jaime Cebola', phone: '840000000', commercialPhone: '840000000', country: 'Moçambique', role: UserRole.ADMIN, isApproved: true, status: 'active', linkedAccounts: [], province: 'Maputo Cidade', district: 'KaMpfumo' },
   { id: 'p1', email: 'parceiro1@ong.org', fullName: 'ONG Ajuda Mútua', phone: '840000001', commercialPhone: '840000001', country: 'Moçambique', role: UserRole.STRATEGIC_PARTNER, isApproved: true, status: 'active', linkedAccounts: [], entityType: EntityType.NGO_INTL, entityName: 'Ajuda Mútua', province: 'Maputo Cidade', district: 'KaMpfumo', logo: 'https://images.unsplash.com/photo-1599305090598-fe179d501c27?auto=format&fit=crop&q=80&w=200' },
-  { id: 'p2', email: 'parceiro2@agro.com', fullName: 'Agro Invest', phone: '840000002', commercialPhone: '840000002', country: 'Moçambique', role: UserRole.STRATEGIC_PARTNER, isApproved: true, status: 'active', linkedAccounts: [], entityType: EntityType.COMPANY, entityName: 'Agro Invest', province: 'Maputo Província', district: 'Matola', logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200' }
+  { id: 'p2', email: 'parceiro2@agro.com', fullName: 'Agro Invest', phone: '840000002', commercialPhone: '840000002', country: 'Moçambique', role: UserRole.STRATEGIC_PARTNER, isApproved: true, status: 'active', linkedAccounts: [], entityType: EntityType.COMPANY, entityName: 'Agro Invest', province: 'Maputo Província', district: 'Matola', logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200' },
+  { id: 't1', email: 'motorista@logistica.co.mz', fullName: 'Celso Matusse', phone: '841234567', commercialPhone: '841234567', country: 'Moçambique', role: UserRole.TRANSPORTER, isApproved: true, status: 'active', linkedAccounts: [], province: 'Sofala', district: 'Beira' },
+  { id: 's1', email: 'produtor@campo.co.mz', fullName: 'Mateus Manhiça', phone: '829988776', commercialPhone: '829988776', country: 'Moçambique', role: UserRole.SELLER, isApproved: true, status: 'active', linkedAccounts: [], province: 'Manica', district: 'Chimoio', entityName: 'Machamba do Mateus' },
+  { id: 'b1', email: 'comprador@mercado.co.mz', fullName: 'Ana Maria', phone: '875544332', commercialPhone: '875544332', country: 'Moçambique', role: UserRole.BUYER, isApproved: true, status: 'active', linkedAccounts: [], province: 'Maputo Cidade', district: 'KaMaxakeni' }
 ];
 
 export const MOCK_PRODUCTS: Product[] = [

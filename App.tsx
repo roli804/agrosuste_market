@@ -10,7 +10,7 @@ import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import PublicReport from './pages/PublicReport';
 import Logo from './components/Logo';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseTableStates } from './lib/supabase';
 
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import AIAgent from './components/AIAgent';
@@ -110,11 +110,6 @@ const AppContent: React.FC = () => {
     window.addEventListener('mock-db-changed', handleDbChange);
 
     const fetchSession = async () => {
-      // FORÇAR LIMPEZA DE SESSÃO AO ATUALIZAR/ABRIR A PÁGINA (Requisito: Refresh reseta para a Home)
-      localStorage.removeItem('mock_user');
-      await supabase.auth.signOut();
-      setUser(null);
-
       try {
         // Since we explicitly signed out above, there is no session to fetch for automatic login
         // But we still need to fetch public data like partners
@@ -123,6 +118,13 @@ const AppContent: React.FC = () => {
         // but we still fetch the partners list below.
 
         // Fetch partners
+        if (supabaseTableStates.profilesMissing) {
+           setError(t('checkout_remove') === 'Remover' ? "Modo Offline: Usando base de dados local para demonstração." : "Offline Mode: Using local mock database for demo.");
+           setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
+           setLoading(false);
+           return;
+        }
+
         const { data: profiles, error: partnersError } = await supabase.from('profiles').select('*').eq('role', UserRole.STRATEGIC_PARTNER);
         if (partnersError) throw partnersError;
         if (profiles && profiles.length > 0) {
@@ -154,9 +156,14 @@ const AppContent: React.FC = () => {
           setPartners(merged);
         }
       } catch (err: any) {
-        console.error("Erro de Acesso:", err);
-        // Se der Failed to fetch, carrega o mock na mesma se existir
-        setError("Não foi possível conectar ao servidor real. As funcionalidades poderão estar limitadas a testes locais.");
+        // Silenciar erro ruidoso se for apenas a tabela em falta no Supabase (comum em dev/mock)
+        if (err?.code === 'PGRST205' || err?.message?.includes('profiles')) {
+          supabaseTableStates.profilesMissing = true;
+          console.log("[AgroSuste] Servidor real sem tabela 'profiles'. Usando Mock local.");
+        } else {
+          console.error("Erro de Acesso:", err);
+        }
+        setError(t('checkout_remove') === 'Remover' ? "Modo Offline: Usando base de dados local para demonstração." : "Offline Mode: Using local mock database for demo.");
         setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
       } finally {
         setLoading(false);
@@ -169,16 +176,19 @@ const AppContent: React.FC = () => {
     });
 
     // --- REAL-TIME SYNC PARA PARCEIROS ---
-    const partnersChannel = supabase
-      .channel('public:profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.${UserRole.STRATEGIC_PARTNER}` }, () => {
-        fetchSession(); // Re-fetch completo para garantir consistência
-      })
-      .subscribe();
+    let partnersChannel: any = null;
+    if (!supabaseTableStates.profilesMissing) {
+      partnersChannel = supabase
+        .channel('public:profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.${UserRole.STRATEGIC_PARTNER}` }, () => {
+          fetchSession(); // Re-fetch completo para garantir consistência
+        })
+        .subscribe();
+    }
 
     return () => {
       subscription.unsubscribe();
-      partnersChannel.unsubscribe();
+      if (partnersChannel) partnersChannel.unsubscribe();
       window.removeEventListener('mock-db-changed', handleDbChange);
     };
   }, []);
@@ -223,6 +233,7 @@ const AppContent: React.FC = () => {
       case UserRole.SELLER:
       case UserRole.TRANSPORTER:
       case UserRole.EXTENSIONIST:
+      case UserRole.BUYER: // COMPRADOR agora entra direto no Dashboard/Profile
         return <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateAccounts={updateLinkedAccounts} />;
       default:
         return <Home addToCart={addToCart} products={products} partners={partners} />;
@@ -242,15 +253,23 @@ const AppContent: React.FC = () => {
             </Link>
 
             <div className="hidden lg:flex items-center gap-6">
-              <Link to="/" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Início</Link>
-              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Mercados</Link>
-              <Link to="/relatorios-publicos" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">Recursos</Link>
+              <Link to="/" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_home')}</Link>
+              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_shop')}</Link>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="hidden md:flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100 mr-2">
                 {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
                   <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold' : 'text-gray-400 hover:text-[#2E7D32]'}`}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* MOBILE LANGUAGE SWITCHER */}
+              <div className="flex md:hidden items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100">
+                {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
+                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm' : 'text-gray-400'}`}>
                     {l.label}
                   </button>
                 ))}
@@ -263,25 +282,37 @@ const AppContent: React.FC = () => {
 
               {user ? (
                 <div className="flex items-center gap-3">
-                  <Link to="/profile" className="flex items-center gap-3 bg-transparent pl-3 pr-2 py-1.5 rounded-[8px] border border-[#E0E0E0] hover:bg-gray-50 transition-all group">
+                  <Link to="/profile" className="flex items-center gap-3 bg-[#FCFCFC] pl-3 pr-2 py-1.5 rounded-[12px] border border-[#E0E0E0] hover:border-[#2E7D32]/30 hover:shadow-sm transition-all group">
                     <div className="hidden sm:flex flex-col items-end">
-                      <span className="text-[14px] font-inter leading-none text-[#263238] group-hover:text-[#2E7D32]">{user.fullName.split(' ')[0]}</span>
+                      <span className="text-[13px] font-bold font-inter leading-none text-[#1C1C1C] mb-1 group-hover:text-[#2E7D32]">{user.fullName.split(' ')[0]}</span>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        user.role === UserRole.ADMIN ? 'bg-amber-100 text-amber-700' :
+                        user.role === UserRole.SELLER ? 'bg-green-100 text-green-700' :
+                        user.role === UserRole.TRANSPORTER ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {user.role === UserRole.ADMIN ? t('role_admin') :
+                         user.role === UserRole.SELLER ? t('role_producer') :
+                         user.role === UserRole.TRANSPORTER ? t('role_logistic') :
+                         user.role === UserRole.STRATEGIC_PARTNER ? t('role_partner') :
+                         t('role_buyer')}
+                      </span>
                     </div>
-                    <div className="w-8 h-8 bg-[#2E7D32] text-white rounded-[6px] flex items-center justify-center font-bold text-xs shadow-sm">
+                    <div className="w-9 h-9 bg-gradient-to-br from-[#2E7D32] to-[#1B5E20] text-white rounded-[9px] flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">
                       {user.fullName[0]}
                     </div>
                   </Link>
-                  <button onClick={handleLogout} className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-[18px] py-[10px] rounded-[8px] text-[14px] font-semibold transition-all">
-                    Sair
+                  <button onClick={handleLogout} className="bg-white border border-[#E0E0E0] text-[#6D6D6D] hover:text-red-600 hover:border-red-100 hover:bg-red-50 px-[16px] py-[10px] rounded-[10px] text-[13px] font-bold transition-all">
+                    {t('nav_logout')}
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <Link to="/auth" className="bg-transparent border border-[#E0E0E0] text-[#263238] hover:bg-gray-50 px-[16px] py-[8px] rounded-[8px] font-inter text-[14px] transition-all">
-                    Login
+                    {t('nav_login')}
                   </Link>
                   <Link to="/auth?mode=register" className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-[18px] py-[10px] border border-transparent rounded-[8px] font-inter font-semibold text-[14px] transition-all hidden sm:block">
-                    Fale com um Consultor
+                    {t('nav_consultant')}
                   </Link>
                 </div>
               )}
@@ -303,45 +334,47 @@ const AppContent: React.FC = () => {
 
           {!isAdminView && (
             <footer className="mt-20 pt-[60px] pb-6 px-[20px] md:px-[80px] bg-[#F1F8F4] border-t border-[#E0E0E0]">
-            <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-[40px] mb-12">
-              <div className="col-span-1">
-                <div className="flex items-center gap-2 mb-4">
-                  <Logo className="w-8 h-8" color="#2E7D32" />
-                  <span className="font-poppins font-bold text-lg text-[#263238]">AgroSuste</span>
-                </div>
-                <p className="text-[14px] text-[#757575] leading-relaxed mb-6 font-inter">
-                  Conectando o campo ao mundo com sustentabilidade
-                </p>
-                <div className="flex gap-4 mb-4">
-                  {/* Social Icons Placeholders */}
-                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">in</div>
-                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">X</div>
-                  <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">f</div>
-                </div>
+            {/* Logo + Tagline section centered */}
+            <div className="max-w-[1400px] mx-auto flex flex-col items-center text-center mb-12">
+              <div className="flex items-center gap-2 mb-3">
+                <Logo className="w-8 h-8" color="#2E7D32" />
+                <span className="font-poppins font-bold text-xl text-[#263238]">AgroSuste</span>
+              </div>
+              <p className="text-[14px] text-[#757575] leading-relaxed font-inter max-w-sm mb-5">
+                {t('footer_tagline')}
+              </p>
+              <div className="flex gap-3 mb-10">
+                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">in</div>
+                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">X</div>
+                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">f</div>
               </div>
 
-              <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Soluções</h4>
-                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
-                  <Link to="/shop" className="hover:text-[#2E7D32] transition-colors w-fit">Marketplace</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Financiamento</Link>
+              {/* 3 Menu columns centered */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-20 w-full max-w-3xl text-left md:text-center">
+                <div>
+                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('nav_solutions')}</h4>
+                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
+                    <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">{t('shop_market_title')}</Link>
+                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">{t('nav_finance')}</Link>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Mercados</h4>
-                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Europa</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Ásia</Link>
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">África</Link>
+                <div>
+                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('shop_categories')}</h4>
+                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
+                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">Europa</Link>
+                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">Ásia</Link>
+                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">África</Link>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <h4 className="font-poppins font-semibold text-[#263238] text-[16px] mb-5">Empresa</h4>
-                <div className="flex flex-col gap-4 text-[15px] font-inter text-[#757575]">
-                  <Link to="#" className="hover:text-[#2E7D32] transition-colors w-fit">Termos de Uso</Link>
-                  <Link to="/relatorios-publicos" className="hover:text-[#2E7D32] transition-colors w-fit">Impacto</Link>
+                <div>
+                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('nav_home')}</h4>
+                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
+                    <Link to="/" className="hover:text-[#2E7D32] transition-colors">{t('nav_home')}</Link>
+                    <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">{t('nav_shop')}</Link>
+                    <Link to="/auth" className="hover:text-[#2E7D32] transition-colors">{t('nav_login')}</Link>
+                  </div>
                 </div>
               </div>
             </div>
