@@ -1,0 +1,13 @@
+No cadastro, enquanto nao for selecionado e escolhido a opcao em provincia o campo distrito, deve estar desabilitado, ate que o user selecione alguma provincia, depois que o campo provincia for selecionado, ele deve habilitar o campo distrito e dar chance de o user selecionar o distrito que quer cadastrar (att. sem mudar a logica eh so para questao de o usuario nao ter duvidas ao usar o sistema)
+ A validacao da password n processo de cadastro deve ser ser naquele momento em que a pessoa esta a colocar a password, ou sej, nao pode esperar no fim clicar o botao de confirmacao de cadastro para dizer que a password deve ser no minimo 6 digitos e deve conter numeros, letras, maiuscula e minusculas, etc...mas esses detalhes devem ser ditos enquanto a pessoa ou usuario introduz a password durante o cadastro
+E peco para tratar o assunto de "esqueceu a senha", para quando o user clicar, receber um link no seu email de reset de credenciais (a nivel da aplicacao),
+O sistema nao mostra os utilizadores do sistema, e parece que nao ha sincronizacao completa com a base de dados e os dados parece que nao persistem na base de dados, peco para que resolva isso quero colocar em producao agora, faca isso rapido, faca de tudo para resolver isso
+
+
+https://market.agrosuste.org
+https://market.agrosuste.org/auth/callback
+https://market.agrosuste.org/reset-password
+https://market.agrosuste.org/update-password
+https://market.agrosuste.org/verify
+https://market.agrosuste.org/login
+https://market.agrosuste.org/signup
