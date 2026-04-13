@@ -54,11 +54,27 @@ const Auth: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [step, setStep] = useState(1);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  const pwdRules = {
+    length: password.length >= 6,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    symbol: /[^A-Za-z0-9]/.test(password),
+  };
+  const pwdValid = Object.values(pwdRules).every(Boolean);
+  const pwdStrength = Object.values(pwdRules).filter(Boolean).length;
 
   const validateStep = (currentStep: number) => {
     if (currentStep === 1) {
       if (!fullName || !email || !password) {
         setError("Por favor, preencha todos os campos obrigatórios.");
+        return false;
+      }
+      if (!pwdValid) {
+        setError("A senha não cumpre todos os requisitos de segurança.");
         return false;
       }
     } else if (currentStep === 2) {
@@ -77,6 +93,17 @@ const Auth: React.FC = () => {
     }
     setError(null);
     return true;
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Introduza o seu email acima primeiro.'); return; }
+    setForgotLoading(true);
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password`
+    });
+    setForgotLoading(false);
+    setForgotSent(true);
+    setError(null);
   };
 
   const nextStep = () => {
@@ -217,44 +244,45 @@ const Auth: React.FC = () => {
         const currentPath = window.location.origin + window.location.pathname;
         const redirectUrl = currentPath.endsWith('/') ? `${currentPath}#/auth` : `${currentPath}/#/auth`;
 
-        const { error: err } = await supabase.auth.signUp({
+        // STEP 1: Criar conta de autenticação com dados mínimos (evita falha do trigger)
+        const { data: signUpData, error: err } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: redirectUrl,
             data: {
               full_name: fullName,
-              phone: `${phoneMeta.prefix}${phone}`,
-              commercial_phone: `${phoneMeta.prefix}${commPhone}`,
               role: finalRole,
-              entity_type: entityType,
-              entity_name: entityType === EntityType.INDIVIDUAL ? fullName : entityName,
-              province,
-              district,
-              posto_administrativo: posto,
-              localidade_bairro: localidade,
               country,
-              status: 'active',
-              balance: 0,
-              isApproved: isAdminEmail, // Admin já nasce aprovado
-              linked_accounts: [],
-              categories: selectedCategories,
-              documents: (entityType === EntityType.COMPANY || entityType === EntityType.COOPERATIVE) ? {
-                nuit,
-                alvara,
-                estatuto,
-                boletim,
-                nuit_file: nuitFile,
-                alvara_file: alvaraFile,
-                estatuto_file: estatutoFile,
-                boletim_file: boletimFile
-              } : undefined,
-              logo: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLogo : undefined,
-              location: (finalRole === UserRole.STRATEGIC_PARTNER || entityType === EntityType.NGO_INTL) ? partnerLocation : undefined
             }
           }
         });
         if (err) throw err;
+
+        // STEP 2: Upsert manual do perfil completo na tabela profiles
+        if (signUpData?.user?.id) {
+          const profilePayload = {
+            id: signUpData.user.id,
+            email,
+            full_name: fullName,
+            phone: `${phoneMeta.prefix}${phone}`,
+            commercial_phone: `${phoneMeta.prefix}${commPhone}`,
+            country,
+            province: province || null,
+            district: district || null,
+            posto_administrativo: posto || null,
+            localidade_bairro: localidade || null,
+            role: finalRole,
+            entity_type: entityType,
+            entity_name: entityType === EntityType.INDIVIDUAL ? fullName : (entityName || fullName),
+            status: 'offline',
+            isapproved: isAdminEmail,
+            balance: 0,
+            linked_accounts: [],
+          };
+          const { error: profileErr } = await supabase.from('profiles').upsert(profilePayload, { onConflict: 'id' });
+          if (profileErr) console.warn('[AgroSuste] Profile upsert warning:', profileErr.message);
+        }
 
         // Se o resgisto no Supabase funcionar, também guardamos no Mock para redundância
         mockDb.saveUser({
@@ -478,7 +506,7 @@ const Auth: React.FC = () => {
               </div>
               <div className="relative pt-1">
                 <div className="flex justify-end w-full mb-1 absolute right-0 -top-4">
-                   <a href="#" className="text-[#2E7D32] text-[12px] hover:text-[#1B5E20] transition-colors font-medium hover:underline">Esqueceu a senha?</a>
+                   {forgotSent ? (<span className="text-green-600 text-[12px] font-medium">\u2705 Link enviado! Verifique o email.</span>) : (<button type="button" onClick={handleForgotPassword} disabled={forgotLoading} className="text-[#2E7D32] text-[12px] hover:text-[#1B5E20] transition-colors font-medium hover:underline disabled:opacity-50">{forgotLoading ? 'A enviar...' : 'Esqueceu a senha?'}</button>)}
                 </div>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} required className="auth-input peer pr-12" placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
@@ -509,12 +537,32 @@ const Auth: React.FC = () => {
                     <label className="auth-floating-label">{t('auth_email')}</label>
                   </div>
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} required className="auth-input peer pr-12" placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
+                    <input type={showPassword ? "text" : "password"} required className={`auth-input peer pr-12 ${password && !pwdValid ? 'border-amber-300' : password && pwdValid ? 'border-green-400' : ''}`} placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
                     <label className="auth-floating-label">{t('auth_password')}</label>
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2E7D32] transition-transform active:scale-95">
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {password.length > 0 && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2 animate-in fade-in duration-300">
+                      <div className="flex gap-1 mb-2">
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= pwdStrength ? (pwdStrength <= 2 ? 'bg-red-400' : pwdStrength <= 3 ? 'bg-amber-400' : 'bg-green-500') : 'bg-gray-200'}`} />
+                        ))}
+                      </div>
+                      {[
+                        { ok: pwdRules.length, label: 'Mínimo 6 caracteres' },
+                        { ok: pwdRules.upper, label: 'Uma letra maiúscula (A-Z)' },
+                        { ok: pwdRules.lower, label: 'Uma letra minúscula (a-z)' },
+                        { ok: pwdRules.number, label: 'Um número (0-9)' },
+                        { ok: pwdRules.symbol, label: 'Um símbolo (!@#$...)' },
+                      ].map(r => (
+                        <div key={r.label} className={`flex items-center gap-2 text-[11px] font-medium transition-colors ${r.ok ? 'text-green-600' : 'text-gray-400'}`}>
+                          <span className="text-[13px]">{r.ok ? '✅' : '○'}</span> {r.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -552,15 +600,24 @@ const Auth: React.FC = () => {
                   {country === 'Moçambique' ? (
                     <>
                       <div className="relative md:col-span-1">
-                        <select className="auth-select peer" value={province} onChange={e => setProvince(e.target.value)}>
+                        <select
+                          className="auth-select peer"
+                          value={province}
+                          onChange={e => { setProvince(e.target.value); setDistrict(''); }}
+                        >
                           <option value="">Selecione...</option>
                           {Object.keys(MOZ_GEOGRAPHY).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_province')}</label>
                       </div>
                       <div className="relative md:col-span-1">
-                        <select className="auth-select peer" value={district} onChange={e => setDistrict(e.target.value)}>
-                          <option value="">Selecione...</option>
+                        <select
+                          className={`auth-select peer ${!province ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          value={district}
+                          disabled={!province}
+                          onChange={e => setDistrict(e.target.value)}
+                        >
+                          <option value="">{province ? 'Selecione...' : '← Selecione Província primeiro'}</option>
                           {(MOZ_GEOGRAPHY[province] || []).map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                         <label className="auth-floating-label !top-[6px] !text-[10px] font-semibold">{t('auth_district')}</label>
@@ -769,7 +826,12 @@ const Auth: React.FC = () => {
                   </button>
                 )}
                 {step < 3 ? (
-                  <button type="button" onClick={nextStep} className="btn-primary w-full shadow-[0_4px_14px_rgba(27,94,32,0.25)] group py-3">
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={step === 1 && (!fullName || !email || !pwdValid)}
+                    className="btn-primary w-full shadow-[0_4px_14px_rgba(27,94,32,0.25)] group py-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  >
                     <span>Próximo</span>
                     <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-1 ml-2" />
                   </button>

@@ -55,7 +55,7 @@ export interface User {
   entityId?: string;
   isApproved: boolean;
   balance?: number;
-  status: 'active' | 'inactive' | 'blocked';
+  status: 'active' | 'inactive' | 'blocked' | 'online' | 'offline';
   linkedAccounts: PaymentAccount[];
   // Novos campos solicitados
   categories?: string[]; // Categorias de produtos que vende

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase, supabaseTableStates } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { User, UserRole, EntityType, Order, ActivityLog, LogType } from '../types';
 import { MOZ_GEOGRAPHY, PLATFORM_COMMISSION_RATE, MOCK_USERS, CATEGORIES } from '../constants';
 import { mockDb } from '../lib/mock_db';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store, MapPin, Eye, XCircle } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, PieChart, ShieldCheck, LayoutDashboard, UserCheck, Truck, Package, Folder, Star, Settings, FileText, CheckCircle, Ban, Store, MapPin, Eye, XCircle, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import Logo from '../components/Logo';
+import NotificationBell from '../components/NotificationBell';
 import { DeliveryRequest, DeliveryStatus } from '../types';
 import DeliveryStatusTimeline from '../components/DeliveryStatusTimeline';
 interface AdminDashboardProps {
@@ -88,14 +89,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
   }, [user, isAuthorized]);
 
   const handleLogout = async () => {
+    if (user?.id) {
+      await supabase.from('profiles').update({ status: 'offline' }).eq('id', user.id);
+    }
     localStorage.removeItem('mock_user');
     await supabase.auth.signOut();
     window.location.href = '/';
   };
 
   const handleBackHome = async () => {
-     // Fazer logout automático ao sair do painel de admin
-     await handleLogout();
+    await handleLogout();
   };
 
   const generatePDF = () => {
@@ -239,60 +242,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
   const fetchOperationalData = async () => {
     setLoading(true);
 
-    // 1. Fetch Users from Supabase
-    if (supabaseTableStates.profilesMissing) {
-       setLoading(false);
-       return; 
-    }
-    let allUsers: User[] = [];
+    let supabaseUsers: User[] = [];
+
     try {
       const { data: dbUsers, error } = await supabase.from('profiles').select('*');
-      if (!error && dbUsers && dbUsers.length > 0) {
-        allUsers = dbUsers.map((u: any) => ({
+      if (error) {
+        console.error('[AdminDashboard] Erro ao buscar profiles:', error.message);
+      } else if (dbUsers && dbUsers.length > 0) {
+        supabaseUsers = dbUsers.map((u: any): User => ({
           id: u.id,
-          email: u.email,
-          fullName: u.full_name || 'Utilizador Oficial',
-          phone: u.phone,
-          commercialPhone: u.commercial_phone || u.phone,
+          email: u.email || '',
+          fullName: u.full_name || 'Utilizador',
+          phone: u.phone || '',
+          commercialPhone: u.commercial_phone || u.phone || '',
           country: u.country || 'Moçambique',
-          role: u.role as UserRole,
-          entityType: u.entity_type as EntityType,
-          entityName: u.entity_name,
           province: u.province,
           district: u.district,
           posto: u.posto_administrativo,
           localidade: u.localidade_bairro,
-          status: u.status || 'active',
-          isApproved: u.isApproved || false,
-          balance: u.balance || 0,
-          linkedAccounts: u.linked_accounts || []
+          role: (u.role as UserRole) || UserRole.BUYER,
+          entityType: (u.entity_type as EntityType) || EntityType.INDIVIDUAL,
+          entityName: u.entity_name,
+          status: (u.status as 'active' | 'inactive' | 'blocked' | 'online' | 'offline') || 'offline',
+          isApproved: u.isapproved ?? false,
+          balance: Number(u.balance) || 0,
+          linkedAccounts: Array.isArray(u.linked_accounts) ? u.linked_accounts : [],
+          logo: u.logo,
         }));
       }
     } catch (e: any) {
-      if (e?.code === 'PGRST205' || e?.message?.includes('profiles')) {
-        supabaseTableStates.profilesMissing = true;
-        console.log("[AgroSuste] AdminDashboard: Tabela 'profiles' não encontrada no Supabase. Usando Mocks.");
-      } else {
-        console.error("Erro ao procurar perfis no Supabase:", e);
-      }
+      console.error('[AdminDashboard] Excepção ao buscar profiles:', e?.message);
     }
 
-    // 2. Merge with Local Mock Users
+    // Merge Supabase + mockDb local (evitar duplicados por id ou email)
     const localUsers = mockDb.getUsers();
-    const finalMockUsers = localUsers.length > 0 ? localUsers : MOCK_USERS;
-
-    const mergedUsers = [...allUsers];
-    finalMockUsers.forEach(lu => {
-      if (!mergedUsers.find(mu => mu.id === lu.id || (lu.email && mu.email === lu.email))) {
-        mergedUsers.push(lu);
+    const merged = [...supabaseUsers];
+    localUsers.forEach(lu => {
+      if (!merged.find(u => u.id === lu.id || (lu.email && u.email === lu.email))) {
+        merged.push(lu);
       }
     });
-    setUsers(mergedUsers);
+
+    setUsers(merged.length > 0 ? merged : MOCK_USERS);
     setActivityLogs(mockDb.getLogs());
 
     const savedOrders = localStorage.getItem('agro_suste_orders');
     if (savedOrders) {
-      setOrders(JSON.parse(savedOrders));
+      try { setOrders(JSON.parse(savedOrders)); } catch {}
     }
 
     setLoading(false);
@@ -519,13 +515,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           <span className="font-bold text-sm text-[#1C1C1C]">AgroSuste <span className="text-[#2E7D32]">{t('role_admin')}</span></span>
         </div>
         <div className="flex gap-2">
-           <button 
-             onClick={handleBackHome} 
+           <button
+             onClick={handleBackHome}
              className="flex items-center gap-2 px-3 py-2 bg-[#2E7D32]/5 text-[#2E7D32] rounded-xl font-bold text-[11px] transition-all active:scale-95"
            >
              <LayoutDashboard size={18} />
              <span>{t('admin_back_home')}</span>
            </button>
+           <NotificationBell userId={user?.id} />
            <button onClick={handleLogout} className="p-2 bg-red-50 rounded-lg text-red-600"><XCircle size={20} /></button>
         </div>
       </div>
@@ -650,15 +647,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                           <p className="text-[10px] text-[#A0A0A0] uppercase">{u.province || 'Moz'}</p>
                         </td>
                         <td className="py-4 px-6">
-                          {u.status === 'active' ? (
-                            <div className="flex items-center gap-1.5 align-middle">
-                              <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-                              <span className="text-xs font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-md">{t('profile_active')}</span>
+                          {u.status === 'online' ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
+                              <span className="text-xs font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-md">Online</span>
+                            </div>
+                          ) : u.status === 'blocked' ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#EF4444]" />
+                              <span className="text-xs font-bold text-[#EF4444] bg-[#EF4444]/10 px-2 py-0.5 rounded-md">{t('admin_blocked')}</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 align-middle">
-                              <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
-                              <span className="text-xs font-bold text-[#EF4444] bg-[#EF4444]/10 px-2 py-0.5 rounded-md">{t('admin_blocked')}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#9CA3AF]" />
+                              <span className="text-xs font-bold text-[#6B7280] bg-gray-100 px-2 py-0.5 rounded-md">Offline</span>
                             </div>
                           )}
                           {!u.isApproved && (
@@ -940,12 +942,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                 <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">ProvÃ­ncia</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.province || 'N/A'}</p></div>
                 <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">Localidade/Distrito</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.localidade || selectedUser.district || 'N/A'}</p></div>
               </div>
-              {/* Simulated action buttons */}
               <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
-                <button className="flex-1 py-3 bg-[#10B981] text-white text-sm font-bold rounded-xl hover:bg-[#059669] transition-colors flex items-center justify-center gap-2 shadow-sm"><CheckCircle size={16} /> Aprovar Registo</button>
-                {!isAdmin && (
-                  <button className="flex-1 py-3 bg-white border border-[#E0E0E0] text-[#1C1C1C] text-sm font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">Imprimir Ficha</button>
-                )}
+                <button
+                  onClick={async () => {
+                    const updated = { ...selectedUser, isApproved: true, status: 'active' as const };
+                    // Persistir no Supabase com o nome de coluna real
+                    await supabase.from('profiles').update({ isapproved: true, status: 'active' }).eq('id', selectedUser.id);
+                    mockDb.saveUser(updated);
+                    mockDb.logActivity({
+                      userId: user?.id || 'admin',
+                      userName: user?.fullName || 'Admin',
+                      userRole: UserRole.ADMIN,
+                      type: LogType.SYSTEM,
+                      description: `Registo aprovado: ${selectedUser.fullName} (${selectedUser.role})`
+                    });
+                    setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+                    setSelectedUser(updated);
+                    alert(`✅ Registo de ${selectedUser.fullName} aprovado com sucesso!`);
+                  }}
+                  className={`flex-1 py-3 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm ${
+                    selectedUser.isApproved ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#10B981] hover:bg-[#059669]'
+                  }`}
+                  disabled={selectedUser.isApproved}
+                >
+                  <CheckCircle size={16} />
+                  {selectedUser.isApproved ? 'Já Aprovado ✔' : 'Aprovar Registo'}
+                </button>
               </div>
             </div>
           </div>
@@ -1189,17 +1211,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
           </symbol>
         </defs>
       </svg>
-      {/* ADD ARROW ICON COMPONENT SINCE LUCIDE IMPORT WASN'T MODIFIED YET */}
     </div>
   );
 };
-
-// Polyfill arrow component if missed
-const ArrowRight = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"></line>
-    <polyline points="12 5 19 12 12 19"></polyline>
-  </svg>
-);
 
 export default AdminDashboard;

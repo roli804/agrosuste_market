@@ -9,8 +9,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import PublicReport from './pages/PublicReport';
+import ResetPassword from './pages/ResetPassword';
+import ExtensionistDashboard from './pages/ExtensionistDashboard';
 import Logo from './components/Logo';
-import { supabase, supabaseTableStates } from './lib/supabase';
+import NotificationBell from './components/NotificationBell';
+import { supabase } from './lib/supabase';
 
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import AIAgent from './components/AIAgent';
@@ -18,27 +21,26 @@ import { mockDb } from './lib/mock_db';
 
 const mapUserFromSession = (sessionUser: any): User | null => {
   if (!sessionUser) return null;
-  const metadata = sessionUser.user_metadata || {};
-  const isAdmin = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(sessionUser.email?.toLowerCase()) || metadata.role === UserRole.ADMIN;
-
+  const m = sessionUser.user_metadata || {};
+  const isAdmin = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(sessionUser.email?.toLowerCase()) || m.role === UserRole.ADMIN;
   return {
     id: sessionUser.id,
     email: sessionUser.email || '',
-    fullName: metadata.full_name || 'Utilizador',
-    phone: metadata.phone || '',
-    commercialPhone: metadata.commercial_phone || metadata.phone || '',
-    country: metadata.country || 'Moçambique',
-    province: metadata.province,
-    district: metadata.district,
-    posto: metadata.posto_administrativo,
-    localidade: metadata.localidade_bairro,
-    entityType: metadata.entity_type,
-    entityName: metadata.entity_name,
-    role: isAdmin ? UserRole.ADMIN : (metadata.role as UserRole || UserRole.BUYER),
+    fullName: m.full_name || 'Utilizador',
+    phone: m.phone || '',
+    commercialPhone: m.commercial_phone || m.phone || '',
+    country: m.country || 'Moçambique',
+    province: m.province,
+    district: m.district,
+    posto: m.posto,
+    localidade: m.localidade,
+    entityType: m.entity_type,
+    entityName: m.entity_name,
+    role: isAdmin ? UserRole.ADMIN : (m.role as UserRole || UserRole.BUYER),
     isApproved: true,
-    balance: metadata.balance || 0,
-    status: (metadata.status as 'active' | 'inactive' | 'blocked') || 'active',
-    linkedAccounts: metadata.linked_accounts || []
+    balance: m.balance || 0,
+    status: (m.status as 'active' | 'inactive' | 'blocked') || 'active',
+    linkedAccounts: m.linked_accounts || []
   };
 };
 
@@ -66,16 +68,10 @@ const AppContent: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [partners, setPartners] = useState<User[]>(() => {
-    const allUsers = mockDb.getUsers();
-    const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
-
-    // Fallback para os estáticos APENAS se não houver manuais, ou merge?
-    // User pediu para deixar 2 ou 3 apenas.
-    const merged = [...localPartners];
+    const local = mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+    const merged = [...local];
     MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
-      if (!merged.find(p => p.email === mp.email)) {
-        merged.push(mp);
-      }
+      if (!merged.find(p => p.email === mp.email)) merged.push(mp);
     });
     return merged;
   });
@@ -85,110 +81,60 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     const handleDbChange = () => {
-      // Refresh products with merge logic
       const existing = mockDb.getProducts();
       const mergedProducts = [...existing];
-      MOCK_PRODUCTS.forEach(mp => {
-        if (!mergedProducts.find(p => p.id === mp.id)) {
-          mergedProducts.push(mp);
-        }
-      });
+      MOCK_PRODUCTS.forEach(mp => { if (!mergedProducts.find(p => p.id === mp.id)) mergedProducts.push(mp); });
       setProducts(mergedProducts);
 
-      // Refresh partners with merge logic
-      const allUsers = mockDb.getUsers();
-      const localPartners = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
-      const mergedPartners = [...localPartners];
+      const local = mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER);
+      const mergedPartners = [...local];
       MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
-        if (!mergedPartners.find(p => p.email === mp.email)) {
-          mergedPartners.push(mp);
-        }
+        if (!mergedPartners.find(p => p.email === mp.email)) mergedPartners.push(mp);
       });
       setPartners(mergedPartners);
     };
 
     window.addEventListener('mock-db-changed', handleDbChange);
 
-    const fetchSession = async () => {
+    const fetchPartners = async () => {
       try {
-        // Since we explicitly signed out above, there is no session to fetch for automatic login
-        // But we still need to fetch public data like partners
-
-        // The mock local fallback block below is disabled for user sessions to ensure hard-resets on reload, 
-        // but we still fetch the partners list below.
-
-        // Fetch partners
-        if (supabaseTableStates.profilesMissing) {
-           setError(t('checkout_remove') === 'Remover' ? "Modo Offline: Usando base de dados local para demonstração." : "Offline Mode: Using local mock database for demo.");
-           setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
-           setLoading(false);
-           return;
-        }
-
-        const { data: profiles, error: partnersError } = await supabase.from('profiles').select('*').eq('role', UserRole.STRATEGIC_PARTNER);
-        if (partnersError) throw partnersError;
+        const { data: profiles } = await supabase.from('profiles').select('*').eq('role', UserRole.STRATEGIC_PARTNER);
         if (profiles && profiles.length > 0) {
           setPartners(profiles.map(p => ({
-            id: p.id,
-            fullName: p.full_name,
-            entityName: p.entity_name,
-            logo: p.logo,
-            role: p.role as UserRole,
-            isApproved: p.isApproved,
-            status: p.status,
-            linkedAccounts: p.linked_accounts || [],
-            email: p.email,
-            phone: p.phone,
-            commercialPhone: p.commercial_phone,
-            country: p.country
+            id: p.id, fullName: p.full_name, entityName: p.entity_name,
+            logo: p.logo, role: p.role as UserRole, isApproved: p.isapproved,
+            status: p.status, linkedAccounts: p.linked_accounts || [],
+            email: p.email, phone: p.phone, commercialPhone: p.commercial_phone, country: p.country
           })));
         } else {
-          // Fallback para mock local centralizado (mockDb)
-          const allUsers = mockDb.getUsers();
-          const partnersFromDb = allUsers.filter(u => u.role === UserRole.STRATEGIC_PARTNER);
-
-          const merged = [...partnersFromDb];
-          MOCK_USERS.filter(u => u.role === UserRole.STRATEGIC_PARTNER).forEach(mp => {
-            if (!merged.find(p => p.email === mp.email)) {
-              merged.push(mp);
-            }
-          });
-          setPartners(merged);
+          handleDbChange();
         }
-      } catch (err: any) {
-        // Silenciar erro ruidoso se for apenas a tabela em falta no Supabase (comum em dev/mock)
-        if (err?.code === 'PGRST205' || err?.message?.includes('profiles')) {
-          supabaseTableStates.profilesMissing = true;
-          console.log("[AgroSuste] Servidor real sem tabela 'profiles'. Usando Mock local.");
-        } else {
-          console.error("Erro de Acesso:", err);
-        }
-        setError(t('checkout_remove') === 'Remover' ? "Modo Offline: Usando base de dados local para demonstração." : "Offline Mode: Using local mock database for demo.");
-        setPartners(mockDb.getUsers().filter(u => u.role === UserRole.STRATEGIC_PARTNER));
-      } finally {
-        setLoading(false);
-      }
+      } catch { handleDbChange(); }
+      finally { setLoading(false); }
     };
-    fetchSession();
+    fetchPartners();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapUserFromSession(session?.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const mappedUser = mapUserFromSession(session?.user);
+      setUser(mappedUser);
+      if (event === 'SIGNED_IN' && session?.user?.id) {
+        supabase.from('profiles').update({ status: 'online' }).eq('id', session.user.id).then(() => {});
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
     });
 
-    // --- REAL-TIME SYNC PARA PARCEIROS ---
-    let partnersChannel: any = null;
-    if (!supabaseTableStates.profilesMissing) {
-      partnersChannel = supabase
-        .channel('public:profiles')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.${UserRole.STRATEGIC_PARTNER}` }, () => {
-          fetchSession(); // Re-fetch completo para garantir consistência
-        })
-        .subscribe();
-    }
+    const partnersChannel = supabase
+      .channel('public:profiles:partners')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.${UserRole.STRATEGIC_PARTNER}` }, () => {
+        fetchPartners();
+      })
+      .subscribe();
 
     return () => {
       subscription.unsubscribe();
-      if (partnersChannel) partnersChannel.unsubscribe();
+      partnersChannel.unsubscribe();
       window.removeEventListener('mock-db-changed', handleDbChange);
     };
   }, []);
@@ -204,6 +150,9 @@ const AppContent: React.FC = () => {
   }, [products]);
 
   const handleLogout = async () => {
+    if (user?.id) {
+      await supabase.from('profiles').update({ status: 'offline' }).eq('id', user.id);
+    }
     await supabase.auth.signOut();
     setUser(null);
   };
@@ -225,15 +174,15 @@ const AppContent: React.FC = () => {
   const RoleBasedHome = () => {
     const isPublicView = location.search.includes('view=public');
     if (!user || isPublicView) return <Home addToCart={addToCart} products={products} partners={partners} />;
-
     switch (user.role) {
       case UserRole.ADMIN:
       case UserRole.STRATEGIC_PARTNER:
         return <AdminDashboard products={products} user={user} onAddProduct={(p) => setProducts([p, ...products])} />;
+      case UserRole.EXTENSIONIST:
+        return <ExtensionistDashboard user={user} onLogout={handleLogout} />;
       case UserRole.SELLER:
       case UserRole.TRANSPORTER:
-      case UserRole.EXTENSIONIST:
-      case UserRole.BUYER: // COMPRADOR agora entra direto no Dashboard/Profile
+      case UserRole.BUYER:
         return <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateAccounts={updateLinkedAccounts} />;
       default:
         return <Home addToCart={addToCart} products={products} partners={partners} />;
@@ -266,7 +215,6 @@ const AppContent: React.FC = () => {
                 ))}
               </div>
 
-              {/* MOBILE LANGUAGE SWITCHER */}
               <div className="flex md:hidden items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100">
                 {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
                   <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm' : 'text-gray-400'}`}>
@@ -327,6 +275,7 @@ const AppContent: React.FC = () => {
             <Route path="/" element={<RoleBasedHome />} />
             <Route path="/shop" element={<Shop addToCart={addToCart} products={products} />} />
             <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/checkout" element={<Checkout cart={cart} user={user} removeFromCart={(id) => setCart(c => c.filter(x => x.id !== id))} clearCart={() => setCart([])} onComplete={() => setCart([])} />} />
             <Route path="/profile" element={user ? <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateAccounts={updateLinkedAccounts} /> : <Navigate to="/auth" />} />
             <Route path="/relatorios-publicos" element={<PublicReport />} />
