@@ -83,10 +83,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
   const isAdmin = user && user.role === UserRole.ADMIN;
 
   useEffect(() => {
-    if (isAuthorized) {
-      fetchOperationalData();
-    }
-  }, [user, isAuthorized]);
+    if (!isAuthorized) return;
+
+    fetchOperationalData();
+
+    // Realtime: reflecte automaticamente qualquer mudanca na tabela profiles
+    const profilesChannel = supabase
+      .channel('admin-profiles-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchOperationalData();
+      })
+      .subscribe();
+
+    // Realtime: reflecte mudancas em products
+    const productsChannel = supabase
+      .channel('admin-products-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchOperationalData();
+      })
+      .subscribe();
+
+    return () => {
+      profilesChannel.unsubscribe();
+      productsChannel.unsubscribe();
+    };
+  }, [isAuthorized]);
 
   const handleLogout = async () => {
     if (user?.id) {
@@ -241,15 +262,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
 
   const fetchOperationalData = async () => {
     setLoading(true);
-
     let supabaseUsers: User[] = [];
 
     try {
-      const { data: dbUsers, error } = await supabase.from('profiles').select('*');
-      if (error) {
-        console.error('[AdminDashboard] Erro ao buscar profiles:', error.message);
-      } else if (dbUsers && dbUsers.length > 0) {
-        supabaseUsers = dbUsers.map((u: any): User => ({
+      // Usa RPC com SECURITY DEFINER — contorna RLS completamente
+      // Devolve TODOS os perfis sem restrições de políticas
+      const { data: allRows, error: rpcError } = await supabase.rpc('get_all_profiles');
+
+      if (rpcError) throw rpcError;
+
+      if (allRows && allRows.length > 0) {
+        supabaseUsers = allRows.map((u: any): User => ({
           id: u.id,
           email: u.email || '',
           fullName: u.full_name || 'Utilizador',
@@ -271,10 +294,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
         }));
       }
     } catch (e: any) {
-      console.error('[AdminDashboard] Excepção ao buscar profiles:', e?.message);
+      console.error('[AdminDashboard] Erro ao buscar profiles:', e?.message);
     }
 
-    // Merge Supabase + mockDb local (evitar duplicados por id ou email)
+    // Merge com mockDb local (sem duplicar)
     const localUsers = mockDb.getUsers();
     const merged = [...supabaseUsers];
     localUsers.forEach(lu => {
@@ -943,31 +966,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ products, user }) => {
                 <div className="p-4 bg-gray-50 rounded-xl border border-[#E0E0E0]/50"><p className="text-[10px] font-bold text-[#A0A0A0] uppercase mb-1">Localidade/Distrito</p><p className="text-sm font-semibold text-[#1C1C1C]">{selectedUser.localidade || selectedUser.district || 'N/A'}</p></div>
               </div>
               <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
-                <button
-                  onClick={async () => {
-                    const updated = { ...selectedUser, isApproved: true, status: 'active' as const };
-                    // Persistir no Supabase com o nome de coluna real
-                    await supabase.from('profiles').update({ isapproved: true, status: 'active' }).eq('id', selectedUser.id);
-                    mockDb.saveUser(updated);
-                    mockDb.logActivity({
-                      userId: user?.id || 'admin',
-                      userName: user?.fullName || 'Admin',
-                      userRole: UserRole.ADMIN,
-                      type: LogType.SYSTEM,
-                      description: `Registo aprovado: ${selectedUser.fullName} (${selectedUser.role})`
-                    });
-                    setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
-                    setSelectedUser(updated);
-                    alert(`✅ Registo de ${selectedUser.fullName} aprovado com sucesso!`);
-                  }}
-                  className={`flex-1 py-3 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm ${
-                    selectedUser.isApproved ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#10B981] hover:bg-[#059669]'
-                  }`}
-                  disabled={selectedUser.isApproved}
-                >
-                  <CheckCircle size={16} />
-                  {selectedUser.isApproved ? 'Já Aprovado ✔' : 'Aprovar Registo'}
-                </button>
+                {selectedUser.isApproved ? (
+                  <div className="flex-1 py-3 bg-[#10B981]/10 text-[#10B981] text-sm font-bold rounded-xl flex items-center justify-center gap-2">
+                    <CheckCircle size={16} /> Já Aprovado ✔
+                  </div>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const btn = document.getElementById('btn-aprovar-registo');
+                      if (btn) { btn.textContent = 'A aprovar...'; (btn as HTMLButtonElement).disabled = true; }
+                      const { error: approveErr } = await supabase.rpc('approve_profile', { target_user_id: selectedUser.id });
+                      if (approveErr) {
+                        if (btn) { btn.textContent = '✕ Erro — tente novamente'; (btn as HTMLButtonElement).disabled = false; }
+                        return;
+                      }
+                      const updated = { ...selectedUser, isApproved: true, status: 'active' as const };
+                      mockDb.saveUser(updated);
+                      mockDb.logActivity({
+                        userId: user?.id || 'admin',
+                        userName: user?.fullName || 'Admin',
+                        userRole: UserRole.ADMIN,
+                        type: LogType.SYSTEM,
+                        description: `Registo aprovado: ${selectedUser.fullName} (${selectedUser.role})`
+                      });
+                      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+                      setSelectedUser(updated);
+                    }}
+                    id="btn-aprovar-registo"
+                    className="flex-1 py-3 text-white text-sm font-bold rounded-xl bg-[#10B981] hover:bg-[#059669] transition-colors flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <CheckCircle size={16} /> Aprovar Registo
+                  </button>
+                )}
               </div>
             </div>
           </div>

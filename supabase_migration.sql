@@ -88,3 +88,75 @@ create policy "profiles_self_insert" on public.profiles
 -- Utilizador pode actualizar o seu próprio perfil
 create policy "profiles_self_update" on public.profiles
   for update to authenticated using (auth.uid() = id);
+
+-- =============================================
+-- 4. FUNÇÃO ADMIN COM AUTO-SYNC (SECURITY DEFINER)
+-- Detecta auth.users sem profile, cria os que faltam,
+-- depois devolve TODOS — nunca mais falta nenhum
+-- =============================================
+create or replace function public.get_all_profiles()
+returns setof public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Auto-sync: criar perfil para qualquer auth.user sem linha em profiles
+  insert into public.profiles (
+    id, email, full_name, status, role, entity_type,
+    isapproved, balance, linked_accounts, country
+  )
+  select
+    u.id,
+    u.email,
+    coalesce(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1), 'Utilizador'),
+    'offline',
+    coalesce(u.raw_user_meta_data->>'role', 'comprador'),
+    coalesce(u.raw_user_meta_data->>'entity_type', 'individual'),
+    false,
+    0,
+    '[]'::jsonb,
+    coalesce(u.raw_user_meta_data->>'country', 'Moçambique')
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where p.id is null
+  on conflict (id) do nothing;
+
+  -- Devolver TODOS os perfis ordenados por data de criação
+  return query select * from public.profiles order by created_at desc;
+end;
+$$;
+
+-- Permitir que utilizadores autenticados chamem esta função
+grant execute on function public.get_all_profiles() to authenticated;
+
+-- =============================================
+-- 4b. FUNÇÃO APROVAR UTILIZADOR (SECURITY DEFINER)
+-- O RLS blocks updates entre users — isto contorna
+-- =============================================
+create or replace function public.approve_profile(target_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+  set isapproved = true, status = 'active'
+  where id = target_user_id;
+end;
+$$;
+
+grant execute on function public.approve_profile(uuid) to authenticated;
+
+-- =============================================
+-- 5. REALTIME — activar para profiles e products
+-- =============================================
+alter table public.profiles replica identity full;
+alter table public.products replica identity full;
+
+do $$
+begin
+  begin alter publication supabase_realtime add table public.profiles; exception when others then null; end;
+  begin alter publication supabase_realtime add table public.products; exception when others then null; end;
+end $$;

@@ -544,23 +544,22 @@ const Auth: React.FC = () => {
                     </button>
                   </div>
                   {password.length > 0 && (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2 animate-in fade-in duration-300">
-                      <div className="flex gap-1 mb-2">
-                        {[1,2,3,4,5].map(i => (
-                          <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= pwdStrength ? (pwdStrength <= 2 ? 'bg-red-400' : pwdStrength <= 3 ? 'bg-amber-400' : 'bg-green-500') : 'bg-gray-200'}`} />
+                    <div className="mt-3 p-4 bg-gray-50 rounded-xl border border-gray-100 animate-in fade-in duration-300">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {[
+                          { ok: pwdRules.length,  label: 'Mín. 6 caracteres' },
+                          { ok: pwdRules.number,  label: 'Um número (0-9)' },
+                          { ok: pwdRules.upper,   label: 'Uma maiúscula (A-Z)' },
+                          { ok: pwdRules.symbol,  label: 'Um símbolo (!@#...)' },
+                        ].map(r => (
+                          <div key={r.label} className={`flex items-center gap-2 text-[12px] font-medium transition-colors duration-200 ${r.ok ? 'text-[#10B981]' : 'text-gray-400'}`}>
+                            <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[11px] font-bold transition-all duration-200 shrink-0 ${r.ok ? 'bg-[#10B981] text-white' : 'bg-gray-200 text-gray-400'}`}>
+                              {r.ok ? '✓' : '○'}
+                            </span>
+                            {r.label}
+                          </div>
                         ))}
                       </div>
-                      {[
-                        { ok: pwdRules.length, label: 'Mínimo 6 caracteres' },
-                        { ok: pwdRules.upper, label: 'Uma letra maiúscula (A-Z)' },
-                        { ok: pwdRules.lower, label: 'Uma letra minúscula (a-z)' },
-                        { ok: pwdRules.number, label: 'Um número (0-9)' },
-                        { ok: pwdRules.symbol, label: 'Um símbolo (!@#$...)' },
-                      ].map(r => (
-                        <div key={r.label} className={`flex items-center gap-2 text-[11px] font-medium transition-colors ${r.ok ? 'text-green-600' : 'text-gray-400'}`}>
-                          <span className="text-[13px]">{r.ok ? '✅' : '○'}</span> {r.label}
-                        </div>
-                      ))}
                     </div>
                   )}
                 </div>
