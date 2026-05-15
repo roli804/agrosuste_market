@@ -52,19 +52,33 @@ const AIAgent: React.FC = () => {
     setInput('');
     setLoading(true);
 
-    if (!ai) {
-      setMessages(prev => [...prev, { role: 'model', text: 'Assistente de IA não configurado. Por favor, contacte o suporte.' }]);
+    if (!groqKey) {
+      setMessages(prev => [...prev, { role: 'model', text: 'Assistente de IA não configurado. Adicione VITE_GROQ_API_KEY no ficheiro .env e reinicie o servidor.' }]);
       setLoading(false);
       return;
     }
 
     try {
-      const history = messages.map(m => `${m.role === 'user' ? 'Utilizador' : 'Assistente'}: ${m.text}`).join('\n');
-      const prompt = `${SYSTEM_PROMPT}\n\n${history}\nUtilizador: ${text}\nAssistente:`;
-      const result = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt });
-      const reply = result.text?.trim() || 'Não consegui gerar uma resposta. Tente novamente.';
+      const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...messages.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text })),
+            { role: 'user', content: text },
+          ],
+          max_tokens: 600,
+          temperature: 0.7,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content?.trim() || 'Não consegui gerar uma resposta. Tente novamente.';
       setMessages(prev => [...prev, { role: 'model', text: reply }]);
-    } catch {
+    } catch (err) {
+      console.error('[AIAgent]', err);
       setMessages(prev => [...prev, { role: 'model', text: 'Erro temporário. Verifique a sua ligação e tente novamente.' }]);
     } finally {
       setLoading(false);
