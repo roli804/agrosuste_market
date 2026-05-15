@@ -36,7 +36,7 @@ export async function verifyEmailCredibility(email: string): Promise<EmailCredib
   }
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `Avalie se o endereço de email é válido e real: ${email}.
       Regras:
       1. Deve ser um email bem formado sintaticamente.
@@ -73,7 +73,7 @@ export async function getVerificationRequirements(country: string): Promise<Veri
   if (!ai) return fallback;
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `List the financial verification requirements for an agricultural marketplace in ${country}.
       Return as JSON with the official document name, a placeholder for that document, a list of standard bank fields required, and common mobile wallet providers.`,
       config: {
@@ -107,7 +107,7 @@ export async function getCountryPhoneInfo(country: string): Promise<CountryPhone
   if (!ai) return fallback;
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `Provide the international phone metadata for: ${country}.
       Include dial code (e.g. +258), digits length (excluding prefix), a placeholder, AND a list of all current valid 2-digit starting prefixes for mobile and fixed operators.
       Return as JSON.`,

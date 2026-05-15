@@ -10,6 +10,7 @@ import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import PublicReport from './pages/PublicReport';
 import ResetPassword from './pages/ResetPassword';
+import ProductDetail from './pages/ProductDetail';
 import ExtensionistDashboard from './pages/ExtensionistDashboard';
 import Logo from './components/Logo';
 import NotificationBell from './components/NotificationBell';
@@ -112,7 +113,32 @@ const AppContent: React.FC = () => {
       } catch { handleDbChange(); }
       finally { setLoading(false); }
     };
+
+    const fetchProducts = async () => {
+      try {
+        const { data, error } = await supabase.from('products').select('*');
+        if (!error && data && data.length > 0) {
+          setProducts(prev => {
+            const merged = [...prev];
+            data.forEach((sp: any) => {
+              const idx = merged.findIndex(p => p.id === sp.id);
+              const mapped = {
+                id: sp.id, producerId: sp.producer_id, categoryId: sp.category_id,
+                name: sp.name, description: sp.description || '', price: sp.price,
+                unit: sp.unit || 'Unidade', stock: sp.stock ?? 0,
+                images: sp.images || [], isDried: sp.is_dried || false,
+              };
+              if (idx >= 0) merged[idx] = { ...merged[idx], ...mapped };
+              else merged.unshift(mapped);
+            });
+            return merged;
+          });
+        }
+      } catch { /* products table may not exist — use mockDb fallback */ }
+    };
+
     fetchPartners();
+    fetchProducts();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const mappedUser = mapUserFromSession(session?.user);
@@ -132,9 +158,17 @@ const AppContent: React.FC = () => {
       })
       .subscribe();
 
+    const productsChannel = supabase
+      .channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchProducts();
+      })
+      .subscribe();
+
     return () => {
       subscription.unsubscribe();
       partnersChannel.unsubscribe();
+      productsChannel.unsubscribe();
       window.removeEventListener('mock-db-changed', handleDbChange);
     };
   }, []);
@@ -190,34 +224,39 @@ const AppContent: React.FC = () => {
   };
 
   const isAdminView = user && [UserRole.ADMIN, UserRole.STRATEGIC_PARTNER].includes(user.role) && location.pathname === '/' && !location.search.includes('view=public');
+  const isAuthView = ['/auth', '/reset-password'].includes(location.pathname);
+  const isHomeView = location.pathname === '/' && !user && !location.search.includes('view=public');
+  const isShopView = location.pathname === '/shop' || location.pathname.startsWith('/product/');
+
+  const navDark = isAuthView;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-green-100 italic-text-fix">
+    <div className={`min-h-screen flex flex-col ${isAuthView ? 'bg-[#162b1a]' : 'bg-[#FAF9F6]'} selection:bg-green-100 italic-text-fix`}>
       {!isAdminView && (
-        <nav className="bg-white text-[#263238] sticky top-0 z-[100] border-b border-[#E0E0E0]">
+        <nav className={`text-[#263238] sticky top-0 z-[100] border-b transition-all duration-500 ${navDark ? 'nav-glass' : 'bg-white border-[#E0E0E0]'}`}>
           <div className="mx-auto px-[20px] md:px-[80px] h-[72px] flex justify-between items-center w-full">
             <Link to="/" className="flex items-center gap-2 group">
-              <Logo className="w-8 h-8 group-hover:rotate-[15deg] transition-transform duration-500" color="#2E7D32" />
-              <span className="font-poppins font-bold text-lg tracking-tight leading-none text-[#263238]">AgroSuste</span>
+              <Logo className="w-8 h-8 group-hover:rotate-[15deg] transition-transform duration-500" color={navDark ? "#A5D6A7" : "#2E7D32"} />
+              <span className="nav-logo-text font-poppins font-bold text-lg tracking-tight leading-none text-[#263238]">AgroSuste</span>
             </Link>
 
             <div className="hidden lg:flex items-center gap-6">
-              <Link to="/" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_home')}</Link>
-              <Link to="/shop" className="text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_shop')}</Link>
+              <Link to="/" className="nav-link text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_home')}</Link>
+              <Link to="/shop" className="nav-link text-[16px] font-inter text-[#263238] hover:text-[#2E7D32] transition-colors hover:border-b-2 hover:border-[#2E7D32] border-b-2 border-transparent pb-1">{t('nav_shop')}</Link>
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100 mr-2">
+              <div className="hidden md:flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100 mr-2 nav-lang-switch">
                 {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
-                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold' : 'text-gray-400 hover:text-[#2E7D32]'}`}>
+                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm font-bold lang-active' : 'text-gray-400 hover:text-[#2E7D32]'}`}>
                     {l.label}
                   </button>
                 ))}
               </div>
 
-              <div className="flex md:hidden items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100">
+              <div className="flex md:hidden items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-100 nav-lang-switch">
                 {[{ code: 'pt', label: 'PT' }, { code: 'en', label: 'IN' }].map(l => (
-                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm' : 'text-gray-400'}`}>
+                  <button key={l.code} onClick={() => setLanguage(l.code)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${language === l.code ? 'bg-white text-[#2E7D32] shadow-sm lang-active' : 'text-gray-400'}`}>
                     {l.label}
                   </button>
                 ))}
@@ -256,10 +295,10 @@ const AppContent: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <Link to="/auth" className="bg-transparent border border-[#E0E0E0] text-[#263238] hover:bg-gray-50 px-[16px] py-[8px] rounded-[8px] font-inter text-[14px] transition-all">
+                  <Link to="/auth" className="entry-point">
                     {t('nav_login')}
                   </Link>
-                  <Link to="/auth?mode=register" className="bg-[#2E7D32] text-white hover:bg-[#1B5E20] px-[18px] py-[10px] border border-transparent rounded-[8px] font-inter font-semibold text-[14px] transition-all hidden sm:block">
+                  <Link to="/auth?mode=register" className="signup-trigger hidden sm:block">
                     {t('nav_consultant')}
                   </Link>
                 </div>
@@ -269,11 +308,12 @@ const AppContent: React.FC = () => {
         </nav>
       )}
 
-      <main className={isAdminView ? "flex-grow bg-[#F5F5F0]" : "flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10"}>
+      <main className={isAdminView ? "flex-grow bg-[#F5F5F0]" : isAuthView ? "flex-grow" : (isHomeView || isShopView) ? "flex-grow" : "flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10"}>
 
           <Routes>
             <Route path="/" element={<RoleBasedHome />} />
             <Route path="/shop" element={<Shop addToCart={addToCart} products={products} />} />
+            <Route path="/product/:id" element={<ProductDetail addToCart={addToCart} products={products} />} />
             <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/checkout" element={<Checkout cart={cart} user={user} removeFromCart={(id) => setCart(c => c.filter(x => x.id !== id))} clearCart={() => setCart([])} onComplete={() => setCart([])} />} />
@@ -281,58 +321,61 @@ const AppContent: React.FC = () => {
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 
-          {!isAdminView && (
-            <footer className="mt-20 pt-[60px] pb-6 px-[20px] md:px-[80px] bg-[#F1F8F4] border-t border-[#E0E0E0]">
-            {/* Logo + Tagline section centered */}
-            <div className="max-w-[1400px] mx-auto flex flex-col items-center text-center mb-12">
-              <div className="flex items-center gap-2 mb-3">
-                <Logo className="w-8 h-8" color="#2E7D32" />
-                <span className="font-poppins font-bold text-xl text-[#263238]">AgroSuste</span>
-              </div>
-              <p className="text-[14px] text-[#757575] leading-relaxed font-inter max-w-sm mb-5">
-                {t('footer_tagline')}
-              </p>
-              <div className="flex gap-3 mb-10">
-                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">in</div>
-                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">X</div>
-                <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#757575] hover:text-[#2E7D32] hover:bg-black/10 transition-colors cursor-pointer text-sm">f</div>
-              </div>
+          {!isAdminView && !isAuthView && (
+            <footer style={{ background: 'linear-gradient(160deg, #0a1a0c 0%, #111e13 100%)' }} className="pt-16 pb-8 px-6 md:px-20 xl:px-32">
+              <div className="max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-16 mb-12">
+                  <div className="md:col-span-1">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Logo className="w-7 h-7" color="#4CAF50" />
+                      <span className="font-poppins font-bold text-lg text-white">AgroSuste</span>
+                    </div>
+                    <p className="text-white/38 text-[13px] leading-relaxed font-inter mb-6 max-w-[220px]">
+                      {t('footer_tagline')}
+                    </p>
+                    <div className="flex gap-2">
+                      {['in', 'X', 'f'].map(s => (
+                        <div key={s} className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/42 hover:text-white hover:bg-white/12 hover:border-white/20 transition-all cursor-pointer text-[12px] font-bold">
+                          {s}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* 3 Menu columns centered */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-20 w-full max-w-3xl text-left md:text-center">
-                <div>
-                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('nav_solutions')}</h4>
-                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
-                    <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">{t('shop_market_title')}</Link>
-                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">{t('nav_finance')}</Link>
+                  <div>
+                    <h4 className="font-poppins font-semibold text-white/80 text-[12px] uppercase tracking-[0.14em] mb-5">{t('nav_solutions')}</h4>
+                    <div className="flex flex-col gap-3">
+                      <Link to="/shop" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{t('shop_market_title')}</Link>
+                      <Link to="#" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{t('nav_finance')}</Link>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-poppins font-semibold text-white/80 text-[12px] uppercase tracking-[0.14em] mb-5">{t('shop_categories')}</h4>
+                    <div className="flex flex-col gap-3">
+                      {['Europa', 'Ásia', 'África'].map(r => (
+                        <Link key={r} to="#" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{r}</Link>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-poppins font-semibold text-white/80 text-[12px] uppercase tracking-[0.14em] mb-5">{t('nav_home')}</h4>
+                    <div className="flex flex-col gap-3">
+                      <Link to="/" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{t('nav_home')}</Link>
+                      <Link to="/shop" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{t('nav_shop')}</Link>
+                      <Link to="/auth" className="text-white/38 text-[13px] font-inter hover:text-white transition-colors">{t('nav_login')}</Link>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('shop_categories')}</h4>
-                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
-                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">Europa</Link>
-                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">Ásia</Link>
-                    <Link to="#" className="hover:text-[#2E7D32] transition-colors">África</Link>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-poppins font-semibold text-[#263238] text-[15px] mb-4">{t('nav_home')}</h4>
-                  <div className="flex flex-col gap-3 text-[14px] font-inter text-[#757575]">
-                    <Link to="/" className="hover:text-[#2E7D32] transition-colors">{t('nav_home')}</Link>
-                    <Link to="/shop" className="hover:text-[#2E7D32] transition-colors">{t('nav_shop')}</Link>
-                    <Link to="/auth" className="hover:text-[#2E7D32] transition-colors">{t('nav_login')}</Link>
-                  </div>
+                <div className="border-t border-white/7 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] font-inter text-white/22">
+                  <p>© 2025 AgroSuste. Todos os direitos reservados</p>
+                  <p>Feito com 🌱 para Moçambique</p>
                 </div>
               </div>
-            </div>
-
-            <div className="max-w-[1400px] mx-auto border-t border-[#E0E0E0] pt-6 flex flex-col items-center justify-center text-[13px] font-inter text-[#9E9E9E]">
-              <p>© 2025 AgroSuste. Todos os direitos reservados</p>
-            </div>
-          </footer>
-        )}
+            </footer>
+          )}
       </main>
       <AIAgent />
 

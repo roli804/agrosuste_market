@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+html { overflow-x: hidden; }
+
 @theme {
   --font-sans: "Inter", "system-ui", "-apple-system", "sans-serif";
   --font-display: "Poppins", "system-ui", "-apple-system", "sans-serif";
@@ -115,4 +117,227 @@ h1, h2, h3, h4, h5, h6 {
 /* Enforce elegant fonts on theme-premium */
 .theme-premium {
     @apply font-sans text-[#1C1C1C];
+}
+
+/* ========================================
+   GLASSMORPHISM — Full Dark Scene System
+   ======================================== */
+
+/* Immersive scene background — deep forest */
+.auth-scene-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 18% 22%, rgba(76, 175, 80, 0.38) 0%, transparent 52%),
+    radial-gradient(ellipse at 86% 10%, rgba(46, 125, 50, 0.30) 0%, transparent 48%),
+    radial-gradient(ellipse at 8%  82%, rgba(27, 94, 32, 0.40) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 86%, rgba(45, 106, 79, 0.32) 0%, transparent 46%),
+    radial-gradient(ellipse at 52% 52%, rgba(212, 163, 115, 0.11) 0%, transparent 55%),
+    linear-gradient(148deg, #102015 0%, #1e3a22 22%, #162e1c 50%, #243e28 74%, #162418 100%);
+  z-index: 0;
+}
+
+/* Orb base */
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+  z-index: 0;
+}
+.auth-orb-1 {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, rgba(76, 175, 80, 0.52) 0%, transparent 68%);
+  filter: blur(74px);
+  top: -22%; left: -14%;
+  animation: orb-float-a 14s ease-in-out infinite;
+}
+.auth-orb-2 {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.46) 0%, transparent 68%);
+  filter: blur(66px);
+  bottom: -18%; right: -10%;
+  animation: orb-float-b 18s ease-in-out infinite;
+}
+.auth-orb-3 {
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, rgba(212, 163, 115, 0.34) 0%, transparent 68%);
+  filter: blur(58px);
+  top: 36%; right: 6%;
+  animation: orb-float-c 12s ease-in-out infinite;
+}
+.auth-orb-4 {
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(165, 214, 167, 0.38) 0%, transparent 68%);
+  filter: blur(52px);
+  bottom: 16%; left: 10%;
+  animation: orb-float-a 21s ease-in-out infinite 4s;
+}
+.auth-orb-5 {
+  width: 180px; height: 180px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.09) 0%, transparent 68%);
+  filter: blur(40px);
+  top: 6%; right: 28%;
+  animation: orb-float-b 16s ease-in-out infinite 2s;
+}
+
+@keyframes orb-float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(42px, -32px) scale(1.06); }
+  66%  { transform: translate(-26px, 20px) scale(0.95); }
+}
+@keyframes orb-float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%  { transform: translate(-36px, 26px) scale(1.04); }
+  70%  { transform: translate(22px, -16px) scale(0.97); }
+}
+@keyframes orb-float-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(30px, 40px) scale(1.07); }
+}
+
+/* Glass card — strong blur over dark forest background */
+.glass-card-auth {
+  background: rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.30),
+    0 2px 8px rgba(0, 0, 0, 0.16),
+    0 48px 96px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.32s;
+}
+.glass-card-auth:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 52px rgba(0, 0, 0, 0.34),
+    0 6px 14px rgba(0, 0, 0, 0.18),
+    0 64px 120px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Nav glass overlay — applied when on auth/dark pages */
+.nav-glass {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(22px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+}
+.nav-glass .nav-logo-text { color: rgba(255,255,255,0.95) !important; }
+.nav-glass .nav-link { color: rgba(255,255,255,0.82) !important; }
+.nav-glass .nav-link:hover { color: white !important; border-color: rgba(255,255,255,0.6) !important; }
+.nav-glass .entry-point {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: white !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.nav-glass .entry-point:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.38);
+  color: white !important;
+  transform: translateY(-1px);
+}
+.nav-glass .signup-trigger {
+  background: linear-gradient(138deg, rgba(76,175,80,0.92) 0%, rgba(46,125,50,0.92) 100%);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* Nav button — Entrar */
+.entry-point {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(218, 218, 218, 0.76);
+  color: #263238;
+  padding: 8px 18px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.034), inset 0 1px 0 rgba(255,255,255,0.92);
+  transition: all 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+}
+.entry-point:hover {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(46, 125, 50, 0.22);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.065), 0 0 0 2px rgba(46, 125, 50, 0.055), inset 0 1px 0 rgba(255,255,255,1);
+  transform: translateY(-1px);
+  color: #1B5E20;
+}
+.entry-point:active { transform: scale(0.97); }
+
+/* Nav button — Cadastrar */
+.signup-trigger {
+  background: linear-gradient(138deg, #2E7D32 0%, #1B5E20 100%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-top-color: rgba(255, 255, 255, 0.26);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  box-shadow:
+    0 4px 16px rgba(27, 94, 32, 0.26),
+    0 1px 3px rgba(0, 0, 0, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  transition: all 0.27s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+}
+.signup-trigger:hover {
+  background: linear-gradient(138deg, #1B5E20 0%, #0D3B12 100%);
+  box-shadow:
+    0 7px 22px rgba(27, 94, 32, 0.37),
+    0 2px 5px rgba(0, 0, 0, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  transform: translateY(-2px);
+}
+.signup-trigger:active { transform: scale(0.97) translateY(0); }
+
+/* Hero CTA */
+.hero-launch-btn {
+  background: linear-gradient(142deg, #2E7D32 0%, #1B5E20 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.32);
+  box-shadow:
+    0 6px 22px rgba(27, 94, 32, 0.32),
+    0 2px 6px rgba(0, 0, 0, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.17);
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+}
+.hero-launch-btn:hover {
+  box-shadow:
+    0 11px 30px rgba(27, 94, 32, 0.42),
+    0 4px 10px rgba(0, 0, 0, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.17);
+  transform: translateY(-3px);
+  background: linear-gradient(142deg, #1B5E20 0%, #0D3B12 100%);
+}
+.hero-launch-btn:active { transform: scale(0.97) translateY(-1px); }
+
+/* Nav lang switcher — dark mode override (used via nav-glass class) */
+.nav-glass .nav-lang-switch {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.13) !important;
+}
+.nav-glass .nav-lang-switch button {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+.nav-glass .nav-lang-switch button:hover {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+.nav-glass .nav-lang-switch .lang-active {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: white !important;
+  box-shadow: none !important;
 }

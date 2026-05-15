@@ -1,227 +1,288 @@
 
-import React, { useState, useEffect } from 'react';
-import { CATEGORIES } from '../constants';
+import React, { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { CATEGORIES, MOZ_GEOGRAPHY } from '../constants';
 import { Product } from '../types';
 import { useLanguage } from '../LanguageContext';
+import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 
 interface ShopProps {
   addToCart: (p: Product) => void;
   products: Product[];
 }
 
+const PRODUCTS_PER_PAGE = 9;
+
+const CERT_LABELS: Record<string, string> = {
+  '1': 'Secagem Natural', '2': 'Rastreável', '3': 'Orgânico',
+  '4': 'Regenerativo', '5': 'Nativo', '6': 'Agro-Tech',
+};
+
+function buildPages(total: number, current: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+  const pages: (number | '...')[] = [];
+  pages.push(0);
+  if (current > 2) pages.push('...');
+  for (let i = Math.max(1, current - 1); i <= Math.min(total - 2, current + 1); i++) pages.push(i);
+  if (current < total - 3) pages.push('...');
+  pages.push(total - 1);
+  return pages;
+}
+
 const Shop: React.FC<ShopProps> = ({ addToCart, products }) => {
-  const { t, translateBatch, language } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [translatedProducts, setTranslatedProducts] = useState<Record<string, { name: string, desc: string }>>({});
-  const [translatedCategories, setTranslatedCategories] = useState<Record<string, string>>({});
+  const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const initCat = searchParams.get('category');
 
-  useEffect(() => {
-    const translateAll = async () => {
-      if (language === 'pt') {
-        const resetProducts: Record<string, { name: string, desc: string }> = {};
-        products.forEach(p => resetProducts[p.id] = { name: p.name, desc: p.description });
-        setTranslatedProducts(resetProducts);
-        
-        const resetCats: Record<string, string> = {};
-        CATEGORIES.forEach(c => resetCats[c.id] = t(c.name));
-        setTranslatedCategories(resetCats);
-        return;
-      }
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(initCat ? [initCat] : []);
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [sortBy, setSortBy] = useState('featured');
+  const [page, setPage] = useState(0);
 
-      // Batch translate products
-      const productTexts: string[] = [];
-      const productMap: { id: string, type: 'name' | 'desc' }[] = [];
-      
-      products.forEach(p => {
-        productTexts.push(p.name);
-        productMap.push({ id: p.id, type: 'name' });
-        productTexts.push(p.description);
-        productMap.push({ id: p.id, type: 'desc' });
-      });
+  const toggleCategory = (id: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+    setPage(0);
+  };
 
-      // Batch translate categories
-      const catTexts = CATEGORIES.map(c => t(c.name));
-
-      const [translatedProductTexts, translatedCatTexts] = await Promise.all([
-        translateBatch(productTexts),
-        translateBatch(catTexts)
-      ]);
-
-      const newProductTrans: Record<string, { name: string, desc: string }> = {};
-      translatedProductTexts.forEach((text, i) => {
-        const info = productMap[i];
-        if (!newProductTrans[info.id]) newProductTrans[info.id] = { name: '', desc: '' };
-        newProductTrans[info.id][info.type] = text;
-      });
-
-      const newCatTrans: Record<string, string> = {};
-      translatedCatTexts.forEach((text, i) => {
-        newCatTrans[CATEGORIES[i].id] = text;
-      });
-
-      setTranslatedProducts(newProductTrans);
-      setTranslatedCategories(newCatTrans);
-    };
-    translateAll();
-  }, [language, products, translateBatch]);
-
-  const filteredProducts = products.filter(p => {
-    const matchesCategory = selectedCategory ? p.categoryId === selectedCategory : true;
-    const trans = translatedProducts[p.id] || { name: p.name, desc: p.description };
-    const matchesSearch = trans.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+  const filtered = products.filter(p => {
+    const catOk = selectedCategories.length === 0 || selectedCategories.includes(p.categoryId);
+    const minOk = !priceMin || p.price >= Number(priceMin);
+    const maxOk = !priceMax || p.price <= Number(priceMax);
+    return catOk && minOk && maxOk;
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'price_asc') return a.price - b.price;
+    if (sortBy === 'price_desc') return b.price - a.price;
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sorted.length / PRODUCTS_PER_PAGE);
+  const paginated = sorted.slice(page * PRODUCTS_PER_PAGE, (page + 1) * PRODUCTS_PER_PAGE);
+  const provinces = Object.keys(MOZ_GEOGRAPHY);
+
+  const goToPage = (p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-12">
-      <div className="flex flex-col lg:flex-row gap-12">
-        {/* Sidebar - Sticky & Elegant */}
-        <aside className="w-full lg:w-80 space-y-8 flex-shrink-0">
-          <div className="sticky top-[100px] space-y-8">
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 bg-[#2E7D32] rounded-full animate-pulse"></span> {t('shop_search_title')}
-              </h3>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder={t('shop_search_placeholder')}
-                  className="w-full bg-[#F5F5F0] border-transparent focus:bg-white focus:border-[#2E7D32] focus:ring-4 focus:ring-[#2E7D32]/5 rounded-2xl py-4 px-5 text-sm font-medium transition-all outline-none"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
+    <div className="bg-[#FAFAF8] min-h-screen">
+      <div className="max-w-[1320px] mx-auto px-5 xl:px-8 py-10">
+        <div className="flex gap-7">
 
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-widest mb-6">{t('shop_categories')}</h3>
-              <div className="space-y-2">
-                <button 
-                  onClick={() => setSelectedCategory(null)}
-                  className={`sidebar-link ${!selectedCategory ? 'active' : ''}`}
-                >
-                  🌾 {t('shop_all_products')}
-                </button>
-                {CATEGORIES.map(cat => (
-                  <button 
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`sidebar-link ${selectedCategory === cat.id ? 'active' : ''}`}
-                  >
-                    <span className="text-lg">{cat.icon}</span> {translatedCategories[cat.id] || t(cat.name)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="hidden lg:block bg-gradient-to-br from-[#2E7D32] to-[#1B5E20] p-8 rounded-3xl text-white shadow-xl overflow-hidden relative group">
-               <div className="relative z-10">
-                  <h4 className="font-poppins font-bold text-lg mb-2">{t('info_official_title')}</h4>
-                  <p className="text-xs text-green-100/80 leading-relaxed mb-6">{t('info_official_desc')}</p>
-                  <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-white/20 backdrop-blur-sm">{t('admin_table_view')}</button>
-               </div>
-               <div className="absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:rotate-12 transition-transform duration-700">🌱</div>
-            </div>
-          </div>
-        </aside>
+          {/* ─── Sidebar ─────────────────────────────────────────── */}
+          <aside className="w-60 flex-shrink-0 hidden lg:block">
+            <div className="sticky top-[88px] space-y-4">
 
-        {/* Main Content */}
-        <div className="flex-grow">
-          <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12 px-2">
-            <div>
-              <h2 className="text-4xl md:text-5xl font-poppins font-bold text-[#1C1C1C] tracking-tight">
-                {selectedCategory ? (translatedCategories[selectedCategory] || t(CATEGORIES.find(c => c.id === selectedCategory)?.name || '')) : t('shop_market_title')}
-              </h2>
-              <div className="flex items-center gap-2 mt-4">
-                <span className="px-3 py-1 bg-[#2E7D32]/10 text-[#2E7D32] rounded-full text-[10px] font-bold uppercase tracking-wider">{t('profile_official')}</span>
-                <span className="text-[#A0A0A0] text-sm font-medium border-l border-gray-200 pl-3">
-                  {t('shop_showing')} {filteredProducts.length} {t('shop_harvests')}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-              {filteredProducts.map((product, idx) => {
-                const trans = translatedProducts[product.id] || { name: product.name, desc: product.description };
-                return (
-                  <div 
-                    key={product.id} 
-                    className="shop-card group animate-in fade-in slide-in-from-bottom-4 duration-500"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    <div className="shop-card-img-wrapper">
-                      <img 
-                        src={product.images[0]} 
-                        alt={trans.name} 
-                        className="shop-card-img"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80';
-                        }}
+              <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
+                <h3 className="font-poppins font-bold text-[10px] text-[#9A9A9A] uppercase tracking-[0.18em] mb-4">Categoria</h3>
+                <div className="space-y-2.5">
+                  {CATEGORIES.map(cat => (
+                    <label key={cat.id} className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(cat.id)}
+                        onChange={() => toggleCategory(cat.id)}
+                        className="w-4 h-4 rounded accent-[#2E7D32]"
                       />
-                      <div className="absolute top-4 right-4 flex flex-col gap-2">
-                         {product.isDried && (
-                           <span className="bg-[#795548] text-white text-[9px] px-3 py-1.5 rounded-full font-bold shadow-lg backdrop-blur-md uppercase tracking-wider">{t('home_dry_grain')}</span>
-                         )}
-                         <span className="bg-white/90 text-[#2E7D32] text-[9px] px-3 py-1.5 rounded-full font-bold shadow-lg backdrop-blur-md flex items-center gap-1 uppercase tracking-wider">
-                           <span className="w-1.5 h-1.5 bg-[#2E7D32] rounded-full"></span> {t('profile_official')}
-                         </span>
-                      </div>
-                    </div>
+                      <span className="text-[13px] text-[#3D3D3D] font-medium group-hover:text-[#2E7D32] transition-colors leading-tight">
+                        {cat.icon} {t(cat.name as any)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-                    <div className="p-5 flex flex-col flex-grow">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-poppins font-bold text-[#1C1C1C] text-[17px] leading-tight group-hover:text-[#2E7D32] transition-colors">{trans.name}</h3>
+              <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
+                <h3 className="font-poppins font-bold text-[10px] text-[#9A9A9A] uppercase tracking-[0.18em] mb-4">Região</h3>
+                <select
+                  value={selectedRegion}
+                  onChange={e => { setSelectedRegion(e.target.value); setPage(0); }}
+                  className="w-full text-[13px] font-medium text-[#3D3D3D] border border-[#E0E0E0] rounded-xl px-3 py-2.5 outline-none focus:border-[#2E7D32] bg-[#FAFAFA]"
+                >
+                  <option value="">Todas as Regiões</option>
+                  {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
+                <h3 className="font-poppins font-bold text-[10px] text-[#9A9A9A] uppercase tracking-[0.18em] mb-4">Intervalo de Preço</h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="Mín"
+                    value={priceMin}
+                    onChange={e => { setPriceMin(e.target.value); setPage(0); }}
+                    className="w-full text-[12px] font-medium border border-[#E0E0E0] rounded-xl px-3 py-2 outline-none focus:border-[#2E7D32] bg-[#FAFAFA]"
+                  />
+                  <span className="text-[#C0C0C0] text-sm font-bold">—</span>
+                  <input
+                    type="number"
+                    placeholder="Máx"
+                    value={priceMax}
+                    onChange={e => { setPriceMax(e.target.value); setPage(0); }}
+                    className="w-full text-[12px] font-medium border border-[#E0E0E0] rounded-xl px-3 py-2 outline-none focus:border-[#2E7D32] bg-[#FAFAFA]"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
+                <h3 className="font-poppins font-bold text-[10px] text-[#9A9A9A] uppercase tracking-[0.18em] mb-4">Nível de Certificação</h3>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] flex-shrink-0" />
+                    <span className="text-[13px] font-medium text-[#3D3D3D]">Padrão Ouro</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#94A3B8] flex-shrink-0" />
+                    <span className="text-[13px] font-medium text-[#3D3D3D]">Padrão Prata</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </aside>
+
+          {/* ─── Main Content ─────────────────────────────────────── */}
+          <div className="flex-grow min-w-0">
+
+            {/* Header */}
+            <div className="mb-7">
+              <h1 className="font-poppins font-bold text-[#1C1C1C] text-[30px] md:text-[36px] leading-tight mb-1.5">
+                Mercado Curado
+              </h1>
+              <p className="text-[#6D6D6D] text-[13px] leading-relaxed mb-5">
+                Descubra produtos <span className="text-[#2E7D32] font-semibold">eticamente provenientes</span> e artesanais de fazendas comprometidas com a saúde{' '}
+                <span className="text-[#2E7D32] font-semibold">planetária</span>.
+              </p>
+
+              <div className="flex items-center justify-between flex-wrap gap-3 pb-5 border-b border-[#F0F0F0]">
+                <span className="text-[13px] text-[#6D6D6D]">
+                  A mostrar{' '}
+                  <strong className="text-[#1C1C1C] font-semibold">{paginated.length}</strong>{' '}
+                  de{' '}
+                  <strong className="text-[#1C1C1C] font-semibold">{filtered.length}</strong>{' '}
+                  resultados
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] text-[#9A9A9A] font-medium">Ordenar por:</span>
+                  <select
+                    value={sortBy}
+                    onChange={e => { setSortBy(e.target.value); setPage(0); }}
+                    className="text-[13px] font-semibold text-[#1C1C1C] border border-[#E0E0E0] rounded-lg px-3 py-1.5 outline-none focus:border-[#2E7D32] bg-white"
+                  >
+                    <option value="featured">Em Destaque</option>
+                    <option value="price_asc">Preço: Menor → Maior</option>
+                    <option value="price_desc">Preço: Maior → Menor</option>
+                    <option value="name">Nome A–Z</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Grid */}
+            {paginated.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {paginated.map(product => (
+                  <div key={product.id} className="group bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden hover:shadow-[0_10px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                    <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-[#F5F5F0]" style={{ height: '200px' }}>
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={e => { e.currentTarget.src = 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80'; }}
+                      />
+                      <div className="absolute top-3 left-3">
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/92 backdrop-blur-sm text-[#2E7D32] shadow-sm border border-[#E8F5E9]">
+                          {CERT_LABELS[product.categoryId] || 'Verificado'}
+                        </span>
                       </div>
-                      <p className="text-[12px] text-[#6D6D6D] leading-relaxed line-clamp-2 mb-4 font-medium">{trans.desc}</p>
-                      
-                      <div className="mt-auto space-y-4">
-                        <div className="flex justify-between items-end border-t border-gray-50 pt-4">
-                          <div>
-                            <p className="text-[9px] font-bold text-[#A0A0A0] uppercase tracking-widest mb-0.5">Preço Atual</p>
-                            <span className="text-xl font-poppins font-bold text-[#2E7D32]">
-                              {product.price.toLocaleString()}
-                              <small className="text-[10px] font-bold text-[#6D6D6D] ml-1 uppercase">MZN / {product.unit}</small>
-                            </span>
-                          </div>
-                          <div className="text-right">
-                             <div className={`text-[9px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${product.stock > 0 ? 'bg-green-50 text-[#2E7D32]' : 'bg-red-50 text-red-600'}`}>
-                               {product.stock > 0 ? `${product.stock} ${t('stock_available')}` : t('admin_no_records')}
-                             </div>
-                          </div>
+                      {product.stock <= 0 && (
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <span className="bg-red-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-full">Esgotado</span>
                         </div>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                          }}
-                          className="w-full bg-[#1C1C1C] hover:bg-[#2E7D32] text-white py-3 rounded-xl font-bold text-[13px] transition-all shadow-lg hover:shadow-[0_8px_25px_rgba(46,125,50,0.25)] flex justify-center items-center gap-2 active:scale-[0.98]"
+                      )}
+                    </Link>
+                    <div className="p-4 flex flex-col flex-grow">
+                      <Link to={`/product/${product.id}`} className="block mb-auto">
+                        <h3 className="font-poppins font-bold text-[#1C1C1C] text-[14px] leading-snug mb-1 group-hover:text-[#2E7D32] transition-colors line-clamp-2">
+                          {product.name}
+                        </h3>
+                        <p className="text-[#B0B0B0] text-[10px] font-semibold uppercase tracking-widest mb-3">
+                          {product.unit}
+                        </p>
+                      </Link>
+                      <div className="flex items-center justify-between mt-2">
+                        <Link to={`/product/${product.id}`} className="font-poppins font-bold text-[#2E7D32] text-[16px]">
+                          {product.price.toLocaleString()}
+                          <span className="text-[10px] font-semibold text-[#A0A0A0] ml-1">MZN</span>
+                        </Link>
+                        <button
+                          onClick={() => addToCart(product)}
+                          disabled={product.stock <= 0}
+                          className="w-8 h-8 bg-[#E8F5E9] hover:bg-[#2E7D32] text-[#2E7D32] hover:text-white rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Adicionar ao carrinho"
                         >
-                          <span className="text-sm">🛒</span> {t('add_to_cart')}
+                          <ShoppingCart size={14} />
                         </button>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-white rounded-[40px] p-24 text-center border border-dashed border-gray-200 flex flex-col items-center max-w-2xl mx-auto shadow-sm">
-              <div className="w-24 h-24 bg-[#F5F5F0] rounded-full flex items-center justify-center text-5xl mb-8 animate-bounce">🌾</div>
-              <h3 className="text-3xl font-poppins font-bold text-[#1C1C1C]">{t('shop_no_products')}</h3>
-              <p className="text-[#6D6D6D] mt-4 font-medium leading-relaxed">{t('shop_no_products_desc')}</p>
-              <button 
-                onClick={() => {setSearchQuery(''); setSelectedCategory(null);}}
-                className="mt-8 text-[#2E7D32] font-bold text-sm underline hover:no-underline"
-              >
-                {t('checkout_remove')}
-              </button>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="text-5xl mb-5">🌾</div>
+                <h3 className="font-poppins font-bold text-[#1C1C1C] text-xl mb-2">Nenhum produto encontrado</h3>
+                <p className="text-[#6D6D6D] text-sm mb-6">Ajusta os filtros para ver mais produtos.</p>
+                <button
+                  onClick={() => { setSelectedCategories([]); setPriceMin(''); setPriceMax(''); }}
+                  className="text-[#2E7D32] font-bold text-sm underline hover:no-underline"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-10">
+                <button
+                  onClick={() => goToPage(Math.max(0, page - 1))}
+                  disabled={page === 0}
+                  className="w-9 h-9 rounded-lg border border-[#E0E0E0] bg-white flex items-center justify-center text-[#6D6D6D] hover:border-[#2E7D32] hover:text-[#2E7D32] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+
+                {buildPages(totalPages, page).map((p, i) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${i}`} className="w-9 h-9 flex items-center justify-center text-[#A0A0A0] text-[13px]">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => goToPage(p as number)}
+                      className={`w-9 h-9 rounded-lg text-[13px] font-bold transition-all ${page === p ? 'bg-[#2E7D32] text-white border border-[#2E7D32] shadow-sm' : 'border border-[#E0E0E0] bg-white text-[#6D6D6D] hover:border-[#2E7D32] hover:text-[#2E7D32]'}`}
+                    >
+                      {(p as number) + 1}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => goToPage(Math.min(totalPages - 1, page + 1))}
+                  disabled={page === totalPages - 1}
+                  className="w-9 h-9 rounded-lg border border-[#E0E0E0] bg-white flex items-center justify-center text-[#6D6D6D] hover:border-[#2E7D32] hover:text-[#2E7D32] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
+
+          </div>
         </div>
       </div>
     </div>

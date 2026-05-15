@@ -37,8 +37,12 @@ const Auth: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    const modeParam = params.get('mode');
     const roleParam = params.get('role');
-    if (roleParam === 'seller') {
+    if (modeParam === 'register') {
+      setMode('signup');
+      setStep(1);
+    } else if (roleParam === 'seller') {
       setMode('signup');
       setRole(UserRole.SELLER);
       setEntityType(EntityType.INDIVIDUAL);
@@ -48,6 +52,7 @@ const Auth: React.FC = () => {
       setEntityType(EntityType.INSTITUTION);
     }
   }, [location.search]);
+  const [loginPhone, setLoginPhone] = useState('');
   const [phone, setPhone] = useState('');
   const [commPhone, setCommPhone] = useState(''); // Contacto Comercial Principal
   const [phoneWarning, setPhoneWarning] = useState<{ personal: string | null, comm: string | null }>({ personal: null, comm: null });
@@ -96,14 +101,23 @@ const Auth: React.FC = () => {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) { setError('Introduza o seu email acima primeiro.'); return; }
+    if (!loginPhone) { setError('Introduza o seu número de telemóvel acima primeiro.'); return; }
     setForgotLoading(true);
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password`
-    });
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', `+258${loginPhone}`)
+        .maybeSingle();
+      const emailForReset = profileData?.email;
+      if (!emailForReset) { setError('Número não encontrado. Verifique ou contacte o suporte.'); setForgotLoading(false); return; }
+      await supabase.auth.resetPasswordForEmail(emailForReset, {
+        redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password`
+      });
+      setForgotSent(true);
+      setError(null);
+    } catch { setError('Erro ao enviar link. Tente novamente.'); }
     setForgotLoading(false);
-    setForgotSent(true);
-    setError(null);
   };
 
   const nextStep = () => {
@@ -163,6 +177,7 @@ const Auth: React.FC = () => {
   });
 
   const resetForm = () => {
+    setLoginPhone('');
     setEmail('');
     setPassword('');
     setFullName('');
@@ -199,8 +214,16 @@ const Auth: React.FC = () => {
 
     try {
       if (mode === 'login') {
-        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
-        if (err) throw err;
+        // Lookup email by phone number
+        const phoneWithPrefix = `+258${loginPhone}`;
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('phone', phoneWithPrefix)
+          .maybeSingle();
+        if (!profileData?.email) throw new Error('Número de telemóvel não encontrado. Verifique o número ou registe-se.');
+        const emailForAuth = profileData.email;
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email: emailForAuth, password });
         
         // --- SINCRONIZAÇÃO PROATIVA ---
         // Se o login no Supabase funcionar, guardamos no Mock para o caso de a rede cair na próxima vez
@@ -319,11 +342,16 @@ const Auth: React.FC = () => {
         console.warn('Utilizando BD Local (Mock) por falha de ligação ao servidor.');
 
         const usersInDb = mockDb.getUsers();
-        const existingUser = usersInDb.find(u => u.email === email);
+        const phoneWithPrefix = `+258${loginPhone}`;
+        const existingUser = usersInDb.find(u =>
+          mode === 'login'
+            ? (u.phone === phoneWithPrefix || u.phone === loginPhone || (u.phone || '').endsWith(loginPhone))
+            : u.email === email
+        );
 
         if (mode === 'login') {
           if (!existingUser) {
-            setError("Utilizador não encontrado. Por favor, registe-se primeiro.");
+            setError("Número de telemóvel não encontrado. Por favor, registe-se primeiro.");
             setLoading(false);
             return;
           }
@@ -410,7 +438,7 @@ const Auth: React.FC = () => {
 
   if (showSuccessMessage) {
     return (
-      <div className="max-w-xl mx-auto my-32 p-16 bg-white rounded-[5rem] shadow-strong text-center space-y-10 border-4 border-amber-50 animate-in zoom-in">
+      <div className="glass-card-auth max-w-xl mx-auto my-16 p-16 rounded-[3.5rem] text-center space-y-10 animate-in zoom-in">
         <div className="w-40 h-40 bg-amber-50 text-amber-600 rounded-[4rem] flex items-center justify-center text-7xl mx-auto">📨</div>
         <div className="space-y-4">
           <h2 className="text-5xl font-semibold text-gray-900  ">{t('auth_success_title')}</h2>
@@ -431,11 +459,21 @@ const Auth: React.FC = () => {
   }
 
   return (
-    <div className="w-full flex justify-center py-12 px-4 bg-[#F5F5F0] min-h-[80vh] transition-all duration-500">
-      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-[16px] border border-transparent shadow-[0_10px_30px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 hover:shadow-[0_15px_35px_rgba(0,0,0,0.08)] hover:-translate-y-1">
+    <div className="relative w-full overflow-hidden flex justify-center items-start px-4 pt-10 pb-16" style={{ minHeight: 'calc(100vh - 72px)' }}>
+      {/* Deep forest background */}
+      <div className="auth-scene-bg" />
+
+      {/* Animated orbs — touch all four corners and center */}
+      <div className="auth-orb auth-orb-1" />
+      <div className="auth-orb auth-orb-2" />
+      <div className="auth-orb auth-orb-3" />
+      <div className="auth-orb auth-orb-4" />
+      <div className="auth-orb auth-orb-5" />
+
+      <div className="glass-card-auth w-full max-w-2xl rounded-[22px] overflow-hidden relative z-10">
         
         {/* CABEÇALHO */}
-        <div className="pt-10 pb-6 px-10 text-center relative border-b border-gray-50 bg-[#FFFFFF]">
+        <div className="pt-10 pb-6 px-10 text-center relative border-b border-white/30">
           <Logo className="w-12 h-12 mx-auto mb-4 transition-transform duration-300 hover:scale-105" color="#2E7D32" />
           <h2 className="text-[28px] md:text-[32px] text-[#1C1C1C] mb-2" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
             {mode === 'login' ? 'Entrar na plataforma' : 'Crie sua conta'}
@@ -501,12 +539,27 @@ const Auth: React.FC = () => {
           {mode === 'login' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="relative">
-                <input type="email" required className="auth-input peer" placeholder=" " value={email} onChange={e => setEmail(e.target.value)} />
-                <label className="auth-floating-label">Email</label>
+                <div className="flex gap-2 items-center">
+                  <span className="bg-[#F3F8F3] border border-[#E8E8E8] px-4 rounded-[10px] flex items-center text-[14px] font-semibold text-[#2E7D32] h-[48px] shrink-0">+258</span>
+                  <div className="relative flex-1">
+                    <input
+                      type="tel"
+                      required
+                      className="auth-input peer"
+                      placeholder=" "
+                      value={loginPhone}
+                      onChange={e => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    />
+                    <label className="auth-floating-label">Numero de telemovel</label>
+                  </div>
+                </div>
               </div>
               <div className="relative pt-1">
                 <div className="flex justify-end w-full mb-1 absolute right-0 -top-4">
-                   {forgotSent ? (<span className="text-green-600 text-[12px] font-medium">\u2705 Link enviado! Verifique o email.</span>) : (<button type="button" onClick={handleForgotPassword} disabled={forgotLoading} className="text-[#2E7D32] text-[12px] hover:text-[#1B5E20] transition-colors font-medium hover:underline disabled:opacity-50">{forgotLoading ? 'A enviar...' : 'Esqueceu a senha?'}</button>)}
+                  {forgotSent
+                    ? <span className="text-green-600 text-[12px] font-medium">\u2705 Link enviado! Verifique o email.</span>
+                    : <button type="button" onClick={handleForgotPassword} disabled={forgotLoading} className="text-[#2E7D32] text-[12px] hover:text-[#1B5E20] transition-colors font-medium hover:underline disabled:opacity-50">{forgotLoading ? 'A enviar...' : 'Esqueceu a senha?'}</button>
+                  }
                 </div>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} required className="auth-input peer pr-12" placeholder=" " value={password} onChange={e => setPassword(e.target.value)} />
@@ -848,100 +901,123 @@ const Auth: React.FC = () => {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap');
-        
+
         .hidden-scroll::-webkit-scrollbar { width: 0px; background: transparent; }
-        
-        .auth-input { 
-          width: 100%; 
+
+        .auth-input {
+          width: 100%;
           height: 48px;
-          padding: 20px 16px 4px 16px; 
-          border-radius: 10px; 
-          border: 1px solid transparent; 
-          background-color: #FAFAFA; 
+          padding: 20px 16px 4px 16px;
+          border-radius: 10px;
+          border: 1px solid #E8E8E8;
+          background: #F8F8F8;
           font-family: 'Inter', sans-serif;
-          font-size: 14px; 
+          font-size: 14px;
           font-weight: 500;
-          color: #1C1C1C; 
-          outline: none; 
-          transition: all 0.3s ease;
+          color: #1C1C1C;
+          outline: none;
+          transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
         }
         .auth-select {
-          width: 100%; 
+          width: 100%;
           height: 48px;
-          padding: 20px 16px 4px 12px; 
-          border-radius: 10px; 
-          border: 1px solid transparent; 
-          background-color: #FAFAFA; 
+          padding: 20px 16px 4px 12px;
+          border-radius: 10px;
+          border: 1px solid #E8E8E8;
+          background: #F8F8F8;
           font-family: 'Inter', sans-serif;
-          font-size: 14px; 
+          font-size: 14px;
           font-weight: 600;
-          color: #2E7D32; 
-          outline: none; 
-          transition: all 0.3s ease;
+          color: #2E7D32;
+          outline: none;
+          transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .auth-input:hover, .auth-select:hover { background-color: #F1F1F1; }
-        
-        .auth-input:focus, .auth-select:focus { 
-          border-color: #2E7D32; 
-          box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.08); 
-          background-color: #FFFFFF;
+        .auth-input:hover, .auth-select:hover {
+          background: #F2F2F2;
+          border-color: #D0D0D0;
         }
-        
-        .auth-floating-label { 
-          position: absolute; 
-          left: 16px; 
-          top: 14px; 
+
+        .auth-input:focus, .auth-select:focus {
+          border-color: #2E7D32;
+          box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+          background: #FFFFFF;
+        }
+
+        .auth-floating-label {
+          position: absolute;
+          left: 16px;
+          top: 14px;
           font-family: 'Inter', sans-serif;
-          font-size: 14px; 
-          color: #8E8E8E; 
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
-          pointer-events: none; 
+          font-size: 14px;
+          color: #8E8E8E;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          pointer-events: none;
         }
 
-        /* Magia do Floating Label Ativo */
-        .auth-input:focus ~ .auth-floating-label, 
+        .auth-input:focus ~ .auth-floating-label,
         .auth-input:not(:placeholder-shown) ~ .auth-floating-label {
-          top: 6px; 
-          font-size: 10px; 
-          color: #2E7D32; 
+          top: 6px;
+          font-size: 10px;
+          color: #2E7D32;
           font-weight: 600;
           letter-spacing: 0.02em;
         }
 
         .btn-primary {
-          background-color: #1B5E20;
+          background: linear-gradient(138deg, #1B5E20 0%, #0D3B12 100%);
           color: white;
           border-radius: 10px;
           padding: 12px 24px;
           font-family: 'Inter', sans-serif;
           font-weight: 600;
           font-size: 15px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-top-color: rgba(255, 255, 255, 0.23);
+          box-shadow:
+            0 4px 16px rgba(27, 94, 32, 0.28),
+            0 1px 3px rgba(0, 0, 0, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.11);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .btn-primary:active:not(:disabled) { transform: scale(0.97); }
-        .btn-primary:hover:not(:disabled) { background-color: #0D3B12; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(27,94,32,0.3); }
+        .btn-primary:hover:not(:disabled) {
+          background: linear-gradient(138deg, #0D3B12 0%, #061808 100%);
+          transform: translateY(-2px);
+          box-shadow:
+            0 8px 24px rgba(27, 94, 32, 0.36),
+            0 2px 6px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.11);
+        }
         .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
 
         .btn-secondary {
-          background-color: transparent;
-          color: #6D6D6D;
+          background: #F4F4F4;
+          color: #5A5A5A;
           border-radius: 10px;
           padding: 12px 24px;
-          border: 1px solid #E0E0E0;
+          border: 1px solid #E2E2E2;
           font-family: 'Inter', sans-serif;
           font-weight: 600;
           font-size: 15px;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+          transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .btn-secondary:active { transform: scale(0.97); }
-        .btn-secondary:hover { background-color: #FAFAFA; color: #1C1C1C; border-color: #D1D5DB; }
+        .btn-secondary:hover {
+          background: #ECECEC;
+          color: #1C1C1C;
+          border-color: #D0D0D0;
+          box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+          transform: translateY(-1px);
+        }
       `}</style>
     </div>
   );
