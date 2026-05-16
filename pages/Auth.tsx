@@ -49,10 +49,12 @@ const Auth: React.FC = () => {
     } else if (roleParam === 'strategic_partner') {
       setMode('signup');
       setRole(UserRole.STRATEGIC_PARTNER);
-      setEntityType(EntityType.INSTITUTION);
+      setEntityType(EntityType.NGO_INTL);
     }
   }, [location.search]);
   const [loginPhone, setLoginPhone] = useState('');
+  // Email se começar com letra; telefone se começar com dígito ou vazio
+  const loginIsEmail = loginPhone.length > 0 && !/^\d/.test(loginPhone);
   const [phone, setPhone] = useState('');
   const [commPhone, setCommPhone] = useState(''); // Contacto Comercial Principal
   const [phoneWarning, setPhoneWarning] = useState<{ personal: string | null, comm: string | null }>({ personal: null, comm: null });
@@ -101,15 +103,18 @@ const Auth: React.FC = () => {
   };
 
   const handleForgotPassword = async () => {
-    if (!loginPhone) { setError('Introduza o seu número de telemóvel acima primeiro.'); return; }
+    if (!loginPhone) { setError('Introduza o seu email ou número de telemóvel acima primeiro.'); return; }
     setForgotLoading(true);
     try {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('phone', `+258${loginPhone}`)
-        .maybeSingle();
-      const emailForReset = profileData?.email;
+      let emailForReset: string | undefined;
+      if (loginPhone.includes('@')) {
+        emailForReset = loginPhone.trim();
+      } else {
+        const bareForgot = loginPhone.replace(/\D/g, '');
+        const { data: foundEmailReset } = await supabase
+          .rpc('get_email_by_phone', { p_phone: bareForgot });
+        emailForReset = foundEmailReset;
+      }
       if (!emailForReset) { setError('Número não encontrado. Verifique ou contacte o suporte.'); setForgotLoading(false); return; }
       await supabase.auth.resetPasswordForEmail(emailForReset, {
         redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password`
@@ -214,17 +219,44 @@ const Auth: React.FC = () => {
 
     try {
       if (mode === 'login') {
-        // Lookup email by phone number
-        const phoneWithPrefix = `+258${loginPhone}`;
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('phone', phoneWithPrefix)
-          .maybeSingle();
-        if (!profileData?.email) throw new Error('Número de telemóvel não encontrado. Verifique o número ou registe-se.');
-        const emailForAuth = profileData.email;
+        let emailForAuth: string;
+        if (loginIsEmail) {
+          emailForAuth = loginPhone.trim();
+        } else {
+          const bare = loginPhone.replace(/\D/g, '');
+          // RPC bypasses RLS — necessário porque o utilizador ainda não está autenticado neste passo
+          const { data: foundEmail, error: lookupErr } = await supabase
+            .rpc('get_email_by_phone', { p_phone: bare });
+          if (lookupErr) throw lookupErr;
+          if (!foundEmail) throw new Error('Número não encontrado. Verifique o número ou inicie sessão com o seu email.');
+          emailForAuth = foundEmail;
+        }
         const { data, error: err } = await supabase.auth.signInWithPassword({ email: emailForAuth, password });
-        
+        if (err) throw err;
+
+        // Se login por email, verificar se perfil existe e criá-lo se não existir
+        if (loginIsEmail && data.user) {
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', data.user.id)
+            .maybeSingle();
+          if (!existingProfile) {
+            const meta = data.user.user_metadata || {};
+            await supabase.from('profiles').upsert({
+              id: data.user.id,
+              email: data.user.email,
+              full_name: meta.full_name || data.user.email,
+              role: meta.role || UserRole.BUYER,
+              country: meta.country || 'Moçambique',
+              status: 'offline',
+              isapproved: ['jaimecebola001@gmail.com','brestondaniel@gmail.com'].includes((data.user.email||'').toLowerCase()),
+              balance: 0,
+              linked_accounts: [],
+            }, { onConflict: 'id' });
+          }
+        }
+
         // --- SINCRONIZAÇÃO PROATIVA ---
         // Se o login no Supabase funcionar, guardamos no Mock para o caso de a rede cair na próxima vez
         if (data.user) {
@@ -277,6 +309,15 @@ const Auth: React.FC = () => {
               full_name: fullName,
               role: finalRole,
               country,
+              phone: `${phoneMeta.prefix}${phone}`,
+              commercial_phone: `${phoneMeta.prefix}${commPhone}`,
+              entity_type: entityType,
+              entity_name: entityType === EntityType.INDIVIDUAL ? fullName : (entityName || fullName),
+              province: province || null,
+              district: district || null,
+              posto_administrativo: posto || null,
+              localidade_bairro: localidade || null,
+              isapproved: isAdminEmail,
             }
           }
         });
@@ -304,7 +345,10 @@ const Auth: React.FC = () => {
             linked_accounts: [],
           };
           const { error: profileErr } = await supabase.from('profiles').upsert(profilePayload, { onConflict: 'id' });
-          if (profileErr) console.warn('[AgroSuste] Profile upsert warning:', profileErr.message);
+          if (profileErr) {
+            console.error('[AgroSuste] Profile upsert FAILED:', profileErr.message, profileErr.details, profileErr.hint);
+            throw new Error(`Conta criada mas perfil não guardado: ${profileErr.message}. Confirme o email e tente novamente ou contacte o suporte.`);
+          }
         }
 
         // Se o resgisto no Supabase funcionar, também guardamos no Mock para redundância
@@ -326,37 +370,30 @@ const Auth: React.FC = () => {
           balance: 0
         });
 
-        // Prevenir sessão automática de signup
+        // Após registo, sempre fazer signout e ir para login — nunca auto-login
         await supabase.auth.signOut();
         resetForm();
-        if (finalRole === UserRole.STRATEGIC_PARTNER) {
-          window.location.href = '/'; // Redirecionar para home e parceiros
-          return;
-        }
         setMode('login');
         setShowSuccessMessage(true);
       }
     } catch (err: any) {
-      // --- TRATAMENTO RIGOROSO DE FALLBACK (MOCK MODE) ---
-      if (err.message === 'Failed to fetch' || err.message.includes('rede') || err.message.includes('network')) {
-        console.warn('Utilizando BD Local (Mock) por falha de ligação ao servidor.');
+      const msg: string = err?.message || '';
 
-        const usersInDb = mockDb.getUsers();
-        const phoneWithPrefix = `+258${loginPhone}`;
-        const existingUser = usersInDb.find(u =>
-          mode === 'login'
-            ? (u.phone === phoneWithPrefix || u.phone === loginPhone || (u.phone || '').endsWith(loginPhone))
-            : u.email === email
-        );
-
+      // Fallback offline — só para erros de rede reais
+      if (msg === 'Failed to fetch' || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch')) {
         if (mode === 'login') {
+          const bare = loginPhone.replace(/\D/g, '');
+          const existingUser = mockDb.getUsers().find(u =>
+            loginIsEmail
+              ? u.email === loginPhone.trim()
+              : (u.phone === `+258${bare}` || u.phone === bare || (u.phone || '').endsWith(bare))
+          );
           if (!existingUser) {
-            setError("Número de telemóvel não encontrado. Por favor, registe-se primeiro.");
+            setError('Sem ligação ao servidor e utilizador não encontrado localmente.');
             setLoading(false);
             return;
           }
-          // Simulação simples de senha (para testes locais, aceitamos a senha se o user existir)
-          const mockSessionUser = {
+          localStorage.setItem('mock_user', JSON.stringify({
             id: existingUser.id,
             email: existingUser.email,
             user_metadata: {
@@ -372,65 +409,38 @@ const Auth: React.FC = () => {
               localidade_bairro: existingUser.localidade,
               country: existingUser.country,
               status: existingUser.status,
-              balance: existingUser.balance
+              balance: existingUser.balance,
             }
-          };
-          localStorage.setItem('mock_user', JSON.stringify(mockSessionUser));
-          mockDb.logActivity({
-            userId: existingUser.id,
-            userName: existingUser.fullName,
-            userRole: existingUser.role as any,
-            type: LogType.LOGIN,
-            description: `Utilizador ${existingUser.fullName} iniciou sessão.`
-          });
+          }));
           window.location.href = '/';
           return;
         } else {
-          // MODO SIGNUP
           const isAdminEmail = ['jaimecebola001@gmail.com', 'brestondaniel@gmail.com'].includes(email.toLowerCase());
           const finalRole = isAdminEmail ? UserRole.ADMIN : role;
-
-          const newMockUser = {
-            id: `local-user-${Date.now()}`,
-            email: email,
-            fullName: fullName,
+          mockDb.saveUser({
+            id: `local-${Date.now()}`, email, fullName,
             phone: `${phoneMeta.prefix}${phone}`,
             commercialPhone: `${phoneMeta.prefix}${commPhone}`,
-            country: country,
-            province: province,
-            district: district,
-            role: finalRole,
-            entityType: entityType,
+            country, province, district, role: finalRole, entityType,
             entityName: entityType === EntityType.INDIVIDUAL ? fullName : entityName,
-            posto: posto,
-            localidade: localidade,
-            status: 'active',
-            isApproved: isAdminEmail,
-            linkedAccounts: [],
-            balance: 0
-          };
-
-          mockDb.saveUser(newMockUser);
-          mockDb.logActivity({
-            userId: newMockUser.id,
-            userName: newMockUser.fullName,
-            userRole: newMockUser.role as any,
-            type: LogType.SIGNUP,
-            description: `Novo utilizador ${newMockUser.fullName} (${newMockUser.role}) registado.`
+            posto, localidade, status: 'active', isApproved: isAdminEmail,
+            linkedAccounts: [], balance: 0,
           });
-
-          // Não forçar login automático após registo em mock
           resetForm();
-          if (finalRole === UserRole.STRATEGIC_PARTNER) {
-            window.location.href = '/'; 
-            return;
-          }
           setMode('login');
           setShowSuccessMessage(true);
           return;
         }
       }
-      setError(err.message);
+
+      // Credenciais inválidas — fica na página de login
+      if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials') || msg.toLowerCase().includes('email not confirmed') === false && msg.toLowerCase().includes('credentials')) {
+        setError('Email/número ou senha incorrectos. Verifique e tente novamente.');
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        setError('Email não confirmado. Verifique a sua caixa de entrada e clique no link.');
+      } else {
+        setError(msg || 'Ocorreu um erro. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -439,20 +449,20 @@ const Auth: React.FC = () => {
   if (showSuccessMessage) {
     return (
       <div className="glass-card-auth max-w-xl mx-auto my-16 p-16 rounded-[3.5rem] text-center space-y-10 animate-in zoom-in">
-        <div className="w-40 h-40 bg-amber-50 text-amber-600 rounded-[4rem] flex items-center justify-center text-7xl mx-auto">📨</div>
+        <div className="w-40 h-40 bg-emerald-50 text-emerald-600 rounded-[4rem] flex items-center justify-center text-7xl mx-auto">✅</div>
         <div className="space-y-4">
-          <h2 className="text-5xl font-semibold text-gray-900  ">{t('auth_success_title')}</h2>
-          <p className="text-gray-500 font-bold text-[10px]">{t('auth_success_desc')}</p>
+          <h2 className="text-4xl font-semibold text-gray-900">Conta criada!</h2>
+          <p className="text-gray-500 text-sm">O seu registo foi concluído com sucesso. Pode agora iniciar sessão com o seu email e senha.</p>
         </div>
-        <button 
-          onClick={() => { 
-            setShowSuccessMessage(false); 
-            setMode('login'); 
-            resetForm(); 
-          }} 
-          className="w-full bg-[#2E5C4E] text-white py-8 rounded-[2rem] font-semibold text-xs shadow-2xl transition-transform active:scale-95"
+        <button
+          onClick={() => {
+            setShowSuccessMessage(false);
+            setMode('login');
+            resetForm();
+          }}
+          className="w-full bg-[#1B5E20] text-white py-5 rounded-2xl font-semibold text-sm shadow-xl transition-all hover:bg-[#0D3B12] active:scale-95"
         >
-          {t('auth_success_btn')}
+          Entrar agora
         </button>
       </div>
     );
@@ -540,17 +550,30 @@ const Auth: React.FC = () => {
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="relative">
                 <div className="flex gap-2 items-center">
-                  <span className="bg-[#F3F8F3] border border-[#E8E8E8] px-4 rounded-[10px] flex items-center text-[14px] font-semibold text-[#2E7D32] h-[48px] shrink-0">+258</span>
+                  {!loginIsEmail && (
+                    <span className="bg-[#F3F8F3] border border-[#E8E8E8] px-4 rounded-[10px] flex items-center text-[14px] font-semibold text-[#2E7D32] h-[48px] shrink-0">+258</span>
+                  )}
                   <div className="relative flex-1">
                     <input
-                      type="tel"
+                      type="text"
                       required
                       className="auth-input peer"
                       placeholder=" "
                       value={loginPhone}
-                      onChange={e => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '') { setLoginPhone(''); return; }
+                        // Primeiro caracter define o modo
+                        if (/^\d/.test(val)) {
+                          // Modo telefone: só dígitos, max 9
+                          setLoginPhone(val.replace(/\D/g, '').slice(0, 9));
+                        } else {
+                          // Modo email: aceita tudo
+                          setLoginPhone(val);
+                        }
+                      }}
                     />
-                    <label className="auth-floating-label">Numero de telemovel</label>
+                    <label className="auth-floating-label">Email ou número de telemóvel</label>
                   </div>
                 </div>
               </div>

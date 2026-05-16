@@ -17,11 +17,9 @@ const isLocal = window.location.hostname === 'localhost' || window.location.host
 const PAYSGATOR_API_KEY = isLocal ? 'mk_test_39226af9_08c7386dae020f4e3d6589e0c46c624c123d7722dbe4a03b34426f199fab2579' : '';
 
 const getProxyUrl = (op: string, id?: string) => {
-  if (isLocal) {
-    const endpoint = op === 'create' ? '/payment/create' : (op === 'confirm' ? '/payment/confirm' : `/transactions/${id}`);
-    return `/api/paysgator${endpoint}`;
-  }
-  return `/paysgator-proxy.php?op=${op}${id ? `&id=${id}` : ''}`;
+  // Em dev: não é usado (modo simulação). Em produção: rota Vercel serverless
+  const endpoint = op === 'create' ? '/payment/create' : op === 'confirm' ? '/payment/confirm' : `/transactions/${id}`;
+  return `/api/paysgator${endpoint}`;
 };
 export interface PaysGatorPaymentRequest {
   method: 'mpesa' | 'emola' | 'mkesh' | 'bank_local';
@@ -43,8 +41,17 @@ export const PaysGatorService = {
    * Em produção, faz POST para https://api.paysgator.com/v1/payments
    */
   async initiateTransaction(data: PaysGatorPaymentRequest): Promise<PaysGatorResponse> {
-    console.log(`[PAYSGATOR GATEWAY] Iniciando processo de pagamento para +258 ${data.phoneNumber}`);
-    
+    // Em desenvolvimento (localhost) simula imediatamente sem chamar a API real —
+    // evita timeouts de 15s e a race condition que revertia o step de 'success' para 'payment'
+    if (isLocal) {
+      return new Promise(resolve => setTimeout(() => resolve({
+        success: true,
+        transactionId: `test_${data.reference}`,
+        message: 'Pedido de PIN simulado (modo dev). Clique "Confirmar PIN" para completar.',
+        status: 'pending'
+      }), 600));
+    }
+
     // Configurar Timeout de 15 segundos para evitar que o ecrã bloqueie infinitamente
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);

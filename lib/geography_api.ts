@@ -3,9 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 let ai: GoogleGenAI | null = null;
 
-if (!apiKey) {
-  console.warn("VITE_GEMINI_API_KEY não foi configurado. Recursos de IA estarão limitados.");
-} else {
+if (apiKey) {
   ai = new GoogleGenAI({ apiKey });
 }
 

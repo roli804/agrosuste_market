@@ -174,13 +174,34 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Sincronizar produtos com o MockDb para persistência central
+    // Persistir produtos novos e actualizados directamente no localStorage sem disparar
+    // 'mock-db-changed' (evita loop: setProducts → saveProduct → handleDbChange → setProducts)
+    const saved: any[] = JSON.parse(localStorage.getItem('agro_suste_products') || '[]');
+    let changed = false;
+
     products.forEach(p => {
-      const existing = mockDb.getProducts();
-      if (!existing.find(ep => ep.id === p.id)) {
-        mockDb.saveProduct(p);
+      const idx = saved.findIndex((s: any) => s.id === p.id);
+      if (idx < 0) {
+        saved.push(p);
+        changed = true;
+      } else if (JSON.stringify(saved[idx]) !== JSON.stringify(p)) {
+        saved[idx] = p;
+        changed = true;
       }
     });
+
+    if (changed) {
+      try {
+        localStorage.setItem('agro_suste_products', JSON.stringify(saved));
+      } catch {
+        // Quota excedida: guardar sem imagens base64 (mantém URLs do Supabase Storage)
+        const stripped = saved.map((p: any) => ({
+          ...p,
+          images: (p.images || []).filter((img: string) => !img.startsWith('data:'))
+        }));
+        try { localStorage.setItem('agro_suste_products', JSON.stringify(stripped)); } catch {}
+      }
+    }
   }, [products]);
 
   const handleLogout = async () => {
@@ -217,7 +238,7 @@ const AppContent: React.FC = () => {
       case UserRole.SELLER:
       case UserRole.TRANSPORTER:
       case UserRole.BUYER:
-        return <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateAccounts={updateLinkedAccounts} />;
+        return <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateProduct={(p) => setProducts(prev => prev.map(x => x.id === p.id ? p : x))} onUpdateAccounts={updateLinkedAccounts} />;
       default:
         return <Home addToCart={addToCart} products={products} partners={partners} />;
     }
@@ -317,7 +338,7 @@ const AppContent: React.FC = () => {
             <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/checkout" element={<Checkout cart={cart} user={user} removeFromCart={(id) => setCart(c => c.filter(x => x.id !== id))} clearCart={() => setCart([])} onComplete={() => setCart([])} />} />
-            <Route path="/profile" element={user ? <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateAccounts={updateLinkedAccounts} /> : <Navigate to="/auth" />} />
+            <Route path="/profile" element={user ? <Profile user={user} products={products} onAddProduct={(p) => setProducts([p, ...products])} onUpdateProduct={(p) => setProducts(prev => prev.map(x => x.id === p.id ? p : x))} onUpdateAccounts={updateLinkedAccounts} /> : <Navigate to="/auth" />} />
             <Route path="/relatorios-publicos" element={<PublicReport />} />
           </Routes>
 

@@ -4,7 +4,7 @@ import React from 'react';
 import { CATEGORIES } from '../constants';
 import { Product, User } from '../types';
 import { useLanguage } from '../LanguageContext';
-import { ArrowRight, ShieldCheck, Banknote, Globe, ShoppingCart } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Banknote, Globe, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const CERT_LABELS: Record<string, string> = {
   '1': 'Secagem Natural', '2': 'Rastreável', '3': 'Orgânico',
@@ -218,75 +218,192 @@ const Home: React.FC<HomeProps> = ({ addToCart, products, partners }) => {
       </section>
 
       {/* ─── PARCEIROS ESTRATÉGICOS ───────────────────────────────────── */}
-      <section className="bg-[#F7F9F7] border-y border-[#E8EEE8] py-20">
-        <div className="px-6 md:px-20 xl:px-32">
+      <section
+        className="relative py-24 overflow-hidden"
+        style={{ background: 'linear-gradient(160deg, #0a1a0c 0%, #111e13 100%)' }}
+      >
+        {/* Glow orbs — green palette, matching the site */}
+        <div className="absolute top-[-80px] left-[10%] w-[480px] h-[480px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(46,125,50,0.28) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-[-60px] right-[8%] w-[380px] h-[380px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(27,94,32,0.22) 0%, transparent 70%)' }} />
+        <div className="absolute top-[40%] left-[55%] w-[260px] h-[260px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(76,175,80,0.10) 0%, transparent 70%)' }} />
+
+        {/* Dot-grid texture */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '28px 28px', opacity: 0.07 }} />
+
+        <div className="px-6 md:px-20 xl:px-32 relative z-10">
           <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-12">
+
+            {/* ── Section header ── */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-14">
               <div>
-                <p className="text-[#2E7D32] text-[11px] font-bold uppercase tracking-[0.2em] mb-3">{t('partners_subtitle')}</p>
-                <h2 className="font-poppins font-bold text-[#1C1C1C]" style={{ fontSize: 'clamp(24px, 2.8vw, 38px)' }}>{t('partners_title')}</h2>
+                <div className="inline-flex items-center gap-2.5 mb-4">
+                  <div className="w-8 h-[1.5px]" style={{ background: '#6ED973' }} />
+                  <p
+                    className="text-[10px] font-bold uppercase"
+                    style={{ color: '#6ED973', letterSpacing: '0.28em' }}
+                  >
+                    {t('partners_subtitle')}
+                  </p>
+                </div>
+                <h2
+                  className="font-poppins font-bold"
+                  style={{
+                    fontSize: 'clamp(26px, 2.8vw, 40px)',
+                    lineHeight: 1.15,
+                    color: '#FFFFFF',
+                    textShadow: '0 2px 24px rgba(0,0,0,0.6)',
+                  }}
+                >
+                  {t('partners_title')}
+                </h2>
               </div>
-              <Link to="/auth?role=strategic_partner" className="premium-btn text-[13px] inline-flex items-center gap-2 whitespace-nowrap">
-                {t('home_be_partner')} <ArrowRight size={15} />
+              <Link
+                to="/auth?role=strategic_partner"
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl font-semibold text-[13px] whitespace-nowrap group transition-all duration-250"
+                style={{
+                  background: 'rgba(255,255,255,0.10)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.18)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.40)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.25)';
+                }}
+              >
+                {t('home_be_partner')}
+                <ArrowRight size={14} className="transition-transform duration-250 group-hover:translate-x-0.5" />
               </Link>
             </div>
 
+            {/* ── Carousel ── */}
             {partners.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {visiblePartners.map(partner => (
-                    <div
-                      key={partner.id}
-                      className="bg-white border border-[#E4EBE4] rounded-2xl p-5 flex flex-col items-center text-center transition-all duration-250 hover:shadow-[0_8px_28px_rgba(46,125,50,0.09)] hover:border-[#2E7D32]/24 hover:-translate-y-1"
-                    >
-                      <div className="w-16 h-16 bg-[#F3F8F3] rounded-xl flex items-center justify-center mb-3 overflow-hidden border border-[#E8EEE8]">
-                        {partner.logo ? (
-                          <img src={partner.logo} alt={partner.entityName || partner.fullName} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-3xl">🤝</span>
-                        )}
+              <div className="flex flex-col items-center gap-8">
+
+                {/* Cards row with flanking arrows */}
+                <div className="flex items-center gap-4 w-full">
+
+                  {/* ← Prev */}
+                  <button
+                    onClick={() => setPartnerPage(p => (p - 1 + totalPartnerPages) % totalPartnerPages)}
+                    aria-label="Anterior"
+                    className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                    style={{
+                      background: 'rgba(255,255,255,0.10)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.22)',
+                      color: 'rgba(255,255,255,0.80)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+
+                  {/* Cards */}
+                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {visiblePartners.map(partner => (
+                      <div
+                        key={partner.id}
+                        className="relative flex flex-col items-center text-center rounded-2xl p-6 transition-all duration-300 group cursor-default hover:-translate-y-1"
+                        style={{
+                          background: 'rgba(255,255,255,0.09)',
+                          backdropFilter: 'blur(24px)',
+                          WebkitBackdropFilter: 'blur(24px)',
+                          border: '1px solid rgba(255,255,255,0.20)',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.14)',
+                        }}
+                      >
+                        {/* Shine on hover */}
+                        <div
+                          className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                          style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)' }}
+                        />
+
+                        {/* Logo */}
+                        <div
+                          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 overflow-hidden flex-shrink-0"
+                          style={{
+                            background: 'rgba(255,255,255,0.13)',
+                            border: '1px solid rgba(255,255,255,0.22)',
+                            backdropFilter: 'blur(8px)',
+                          }}
+                        >
+                          {partner.logo
+                            ? <img src={partner.logo} alt={partner.entityName || partner.fullName} className="w-full h-full object-cover" />
+                            : <span className="text-2xl">🤝</span>
+                          }
+                        </div>
+
+                        <h4
+                          className="font-poppins font-bold text-[13px] mb-2 line-clamp-2 w-full leading-snug"
+                          style={{ color: '#FFFFFF' }}
+                        >
+                          {partner.entityName || partner.fullName}
+                        </h4>
+                        <span
+                          className="text-[9px] font-bold uppercase"
+                          style={{ color: '#6ED973', letterSpacing: '0.16em' }}
+                        >
+                          {partner.entityType || 'Estratégico'}
+                        </span>
                       </div>
-                      <h4 className="font-poppins font-bold text-[#1C1C1C] text-[13px] mb-1 line-clamp-1 w-full">
-                        {partner.entityName || partner.fullName}
-                      </h4>
-                      <span className="text-[#2E7D32] text-[9px] font-bold uppercase tracking-widest">
-                        {partner.entityType || 'Estratégico'}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+
+                  {/* → Next */}
+                  <button
+                    onClick={() => setPartnerPage(p => (p + 1) % totalPartnerPages)}
+                    aria-label="Próximo"
+                    className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                    style={{
+                      background: 'rgba(255,255,255,0.10)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.22)',
+                      color: 'rgba(255,255,255,0.80)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
 
-                {/* Pagination */}
+                {/* Dot indicators */}
                 {totalPartnerPages > 1 && (
-                  <div className="flex items-center justify-center gap-4 mt-10">
-                    <button
-                      onClick={() => setPartnerPage(p => Math.max(0, p - 1))}
-                      disabled={partnerPage === 0}
-                      className="w-10 h-10 rounded-full border border-[#DDEADD] bg-white flex items-center justify-center text-[#2E7D32] hover:bg-[#E8F5E9] hover:border-[#2E7D32]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold"
-                    >‹</button>
-
-                    <div className="flex items-center gap-2">
-                      {Array.from({ length: totalPartnerPages }).map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setPartnerPage(i)}
-                          className={`rounded-full transition-all duration-300 ${partnerPage === i ? 'w-7 h-2.5 bg-[#2E7D32]' : 'w-2.5 h-2.5 bg-[#CDD8CD] hover:bg-[#2E7D32]/50'}`}
-                          aria-label={`Página ${i + 1}`}
-                        />
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setPartnerPage(p => Math.min(totalPartnerPages - 1, p + 1))}
-                      disabled={partnerPage === totalPartnerPages - 1}
-                      className="w-10 h-10 rounded-full border border-[#DDEADD] bg-white flex items-center justify-center text-[#2E7D32] hover:bg-[#E8F5E9] hover:border-[#2E7D32]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold"
-                    >›</button>
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: totalPartnerPages }).map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPartnerPage(i)}
+                        aria-label={`Página ${i + 1}`}
+                        className="rounded-full transition-all duration-300"
+                        style={{
+                          width: partnerPage === i ? '28px' : '8px',
+                          height: '8px',
+                          background: partnerPage === i ? '#4CAF50' : 'rgba(255,255,255,0.25)',
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <div className="h-36 flex items-center justify-center">
-                <p className="text-[#A0A0A0] font-medium italic">{t('home_partners_loading')}</p>
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)' }}
+                >
+                  <span className="text-2xl opacity-50">🤝</span>
+                </div>
+                <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.50)' }}>{t('home_partners_loading')}</p>
               </div>
             )}
           </div>

@@ -138,7 +138,8 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, user, removeFromCart, clearCa
       phoneNumber,
       reference: shortReference,
     });
-    if (!response.success) { setErrorMessage(response.message); setStep('payment'); }
+    // Só reverter se ainda estiver em waiting_pin — evita sobrescrever 'success' se o utilizador já confirmou
+    if (!response.success) { setErrorMessage(response.message); setStep(s => s === 'waiting_pin' ? 'payment' : s); }
   };
 
   const handleSimulatePayment = () => {
